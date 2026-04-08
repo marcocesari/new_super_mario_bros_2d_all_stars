@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Yoshi Sprite Picker</title>
+<style>
+  body { margin: 10px; background: #222; color: #fff; font-family: monospace; }
+  #container { position: relative; display: inline-block; cursor: crosshair; }
+  #container img { display: block; }
+  .box {
+    position: absolute; border: 2px solid red; background: rgba(255,0,0,0.15);
+    cursor: move; min-width: 10px; min-height: 10px;
+  }
+  .box .label {
+    position: absolute; top: -18px; left: 0; font-size: 12px;
+    background: red; color: #fff; padding: 1px 4px; white-space: nowrap;
+  }
+  .box .handle {
+    position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px;
+    background: yellow; cursor: nwse-resize;
+  }
+  .box.selected { border-color: lime; background: rgba(0,255,0,0.15); }
+  .box.selected .label { background: lime; color: #000; }
+  #coords { position: fixed; top: 10px; right: 10px; background: #333; padding: 10px;
+    border: 1px solid #555; max-height: 90vh; overflow-y: auto; width: 340px; }
+  #coords h3 { margin: 0 0 8px; }
+  button { margin: 4px 2px; padding: 4px 10px; cursor: pointer; }
+  #output { background: #111; padding: 8px; margin-top: 8px; font-size: 12px;
+    white-space: pre; max-height: 300px; overflow-y: auto; border: 1px solid #444; }
+  .zoom-info { font-size: 11px; color: #aaa; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<div id="coords">
+  <h3>Sprite Picker</h3>
+  <div class="zoom-info">Click+drag to create box. Drag box to move. Yellow handle to resize.</div>
+  <button onclick="addBox('walk1')">+ Walk 1</button>
+  <button onclick="addBox('walk2')">+ Walk 2</button>
+  <button onclick="addBox('eat')">+ Eat</button><br>
+  <button onclick="addBox('hatch1')">+ Hatch 1</button>
+  <button onclick="addBox('hatch2')">+ Hatch 2</button>
+  <button onclick="addBox('hatch3')">+ Hatch 3</button>
+  <button onclick="addBox('hatch4')">+ Hatch 4</button>
+  <button onclick="addBox('hatch5')">+ Hatch 5</button><br>
+  <button onclick="deleteSelected()">Delete selected</button>
+  <button onclick="exportCoords()">Export JS</button>
+  <div id="output"></div>
+</div>
+
+<div id="container">
+  <img id="sheet" src="../assets/images of Yoshi.png">
+</div>
+
+<script>
+const container = document.getElementById('container');
+const output = document.getElementById('output');
+let boxes = [];
+let selected = null;
+let dragging = null;
+let resizing = null;
+let dragOff = { x: 0, y: 0 };
+
+function addBox(name, x, y, w, h) {
+  x = x || 100; y = y || 100; w = w || 80; h = h || 80;
+  let div = document.createElement('div');
+  div.className = 'box';
+  div.style.left = x + 'px'; div.style.top = y + 'px';
+  div.style.width = w + 'px'; div.style.height = h + 'px';
+  div.innerHTML = '<div class="label">' + name + '</div><div class="handle"></div>';
+  container.appendChild(div);
+  let box = { name, div, x, y, w, h };
+  boxes.push(box);
+  selectBox(box);
+
+  div.addEventListener('mousedown', function(e) {
+    if (e.target.classList.contains('handle')) {
+      resizing = box;
+      dragOff.x = e.clientX;
+      dragOff.y = e.clientY;
+    } else {
+      dragging = box;
+      let rect = div.getBoundingClientRect();
+      dragOff.x = e.clientX - rect.left;
+      dragOff.y = e.clientY - rect.top;
+    }
+    selectBox(box);
+    e.stopPropagation();
+    e.preventDefault();
+  });
+}
+
+function selectBox(box) {
+  if (selected) selected.div.classList.remove('selected');
+  selected = box;
+  if (box) box.div.classList.add('selected');
+}
+
+function deleteSelected() {
+  if (!selected) return;
+  selected.div.remove();
+  boxes = boxes.filter(b => b !== selected);
+  selected = null;
+}
+
+function updateBox(box) {
+  box.div.style.left = box.x + 'px';
+  box.div.style.top = box.y + 'px';
+  box.div.style.width = box.w + 'px';
+  box.div.style.height = box.h + 'px';
+}
+
+document.addEventListener('mousemove', function(e) {
+  if (dragging) {
+    let cr = container.getBoundingClientRect();
+    dragging.x = Math.round(e.clientX - cr.left - dragOff.x);
+    dragging.y = Math.round(e.clientY - cr.top - dragOff.y);
+    updateBox(dragging);
+  }
+  if (resizing) {
+    let dx = e.clientX - dragOff.x;
+    let dy = e.clientY - dragOff.y;
+    resizing.w = Math.max(10, resizing.w + dx);
+    resizing.h = Math.max(10, resizing.h + dy);
+    dragOff.x = e.clientX;
+    dragOff.y = e.clientY;
+    updateBox(resizing);
+  }
+});
+
+document.addEventListener('mouseup', function() {
+  if (dragging) { dragging.x = parseInt(dragging.div.style.left); dragging.y = parseInt(dragging.div.style.top); }
+  if (resizing) { resizing.w = parseInt(resizing.div.style.width); resizing.h = parseInt(resizing.div.style.height); }
+  dragging = null;
+  resizing = null;
+});
+
+function exportCoords() {
+  let lines = ['const YOSHI_FRAMES = {'];
+  let walk = boxes.filter(b => b.name.startsWith('walk'));
+  let hatch = boxes.filter(b => b.name.startsWith('hatch'));
+  let eat = boxes.filter(b => b.name === 'eat');
+
+  if (walk.length) {
+    lines.push('  walk: [');
+    walk.forEach(b => lines.push('    { x: ' + b.x + ', y: ' + b.y + ', w: ' + b.w + ', h: ' + b.h + ' },'));
+    lines.push('  ],');
+    lines.push('  idle: [{ x: ' + walk[0].x + ', y: ' + walk[0].y + ', w: ' + walk[0].w + ', h: ' + walk[0].h + ' }],');
+  }
+  if (eat.length) {
+    lines.push('  eat: [{ x: ' + eat[0].x + ', y: ' + eat[0].y + ', w: ' + eat[0].w + ', h: ' + eat[0].h + ' }],');
+  }
+  if (hatch.length) {
+    lines.push('  hatch: [');
+    hatch.sort((a, b) => parseInt(a.name.replace('hatch','')) - parseInt(b.name.replace('hatch','')));
+    hatch.forEach(b => lines.push('    { x: ' + b.x + ', y: ' + b.y + ', w: ' + b.w + ', h: ' + b.h + ' },'));
+    lines.push('  ],');
+  }
+  lines.push('};');
+  output.textContent = lines.join('\n');
+}
+
+// Pre-populate with current guesses
+addBox('walk1', 100, 510, 80, 90);
+addBox('walk2', 185, 510, 80, 90);
+addBox('eat', 105, 875, 90, 70);
+addBox('hatch1', 108, 338, 38, 40);
+addBox('hatch2', 155, 330, 44, 48);
+addBox('hatch3', 215, 322, 52, 56);
+addBox('hatch4', 275, 315, 58, 63);
+addBox('hatch5', 350, 305, 70, 78);
+selectBox(null);
+</script>
+</body>
+</html>
