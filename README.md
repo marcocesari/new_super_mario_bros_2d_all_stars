@@ -8,6 +8,12 @@ Three worlds, two players, mushrooms, pipes, Yoshi — and a tongue that eats Go
   <img src="screenshot.jpg" width="600"/>
 </p>
 
+## Play online
+
+Click to play in your browser: https://editor.p5js.org/marcocesari/full/vI0fEBG94
+
+> Hosted on the [p5.js Web Editor](https://editor.p5js.org/). The first load takes a few seconds while the music files download. Click anywhere on the canvas first — browsers block audio until you interact with the page.
+
 ## Features
 
 - **3 themed worlds** — sky 1-1, underground 1-2, and a sunset 1-3
