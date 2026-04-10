@@ -2,14 +2,22 @@
 
 // Gamepad mapping state
 let gpConnected = false;
-let gpMapping = { jump: -1, start: -1 };
-let gpMapStep = 0;       // 0=jump, 1=start
+let gpMapping = { left: -1, right: -1, jump: -1, eat: -1, dismount: -1, callYoshi: -1, start: -1 };
+let gpMapStep = 0;       // 0=left, 1=right, 2=jump, 3=eat, 4=dismount, 5=callYoshi, 6=start
 let gpMapped = false;
 let gpMapCooldown = 0;
 let gpDetectPhase = true; // true = waiting for gamepad detection
 let gpLastButtons = [];   // track button states for edge detection
-const GP_MAP_LABELS = ['JUMP (A/B)', 'RESTART (Start)'];
-const GP_MAP_NAMES = ['jump', 'start'];
+const GP_MAP_LABELS = [
+  'MOVE LEFT (or tilt stick)',
+  'MOVE RIGHT (or tilt stick)',
+  'JUMP (A)',
+  'YOSHI EAT (B)',
+  'GET OFF YOSHI (X)',
+  'CALL YOSHI (Y)',
+  'RESTART (Start)',
+];
+const GP_MAP_NAMES = ['left', 'right', 'jump', 'eat', 'dismount', 'callYoshi', 'start'];
 
 // Joystick dead zone
 const STICK_DEADZONE = 0.3;
@@ -34,8 +42,8 @@ function drawMenu() {
   noStroke();
   textAlign(CENTER, CENTER);
 
-  textSize(42);
-  text('SUPER MARIO 2D', width / 2, 100);
+  textSize(28);
+  text('NEW SUPER MARIO BROS 2D ALL STARS', width / 2, 100);
 
   textSize(14);
   text('A p5.js game', width / 2, 140);
@@ -157,8 +165,8 @@ function drawControllerConnect() {
 
     textSize(16);
     fill(180);
-    text('Joystick = movement (auto-detected)', width / 2, 110);
-    text('Now map your buttons:', width / 2, 135);
+    text('Map each control. For LEFT / RIGHT you can either', width / 2, 110);
+    text('press a button OR tilt the analog stick to skip.', width / 2, 130);
 
     if (gpMapCooldown > 0) {
       textSize(22);
@@ -174,29 +182,61 @@ function drawControllerConnect() {
     }
 
     // Show already mapped
-    textSize(16);
-    let y = 360;
+    textSize(14);
+    let y = 350;
     for (let i = 0; i < gpMapStep; i++) {
       fill(50, 200, 50);
-      text('\u2713 ' + GP_MAP_LABELS[i] + '  =  Button ' + gpMapping[GP_MAP_NAMES[i]], width / 2, y);
-      y += 25;
+      let val = gpMapping[GP_MAP_NAMES[i]];
+      let valText = val < 0 ? 'Joystick' : ('Button ' + val);
+      text('\u2713 ' + GP_MAP_LABELS[i] + '  =  ' + valText, width / 2, y);
+      y += 22;
     }
 
-    // Detect button press for mapping
+    // Detect input for mapping
     if (gp && gpMapCooldown <= 0) {
-      for (let i = 0; i < gp.buttons.length; i++) {
-        let wasPressed = gpLastButtons[i] || false;
-        let isPressed = gp.buttons[i].pressed;
-        if (isPressed && !wasPressed) {
-          gpMapping[GP_MAP_NAMES[gpMapStep]] = i;
+      let curStep = GP_MAP_NAMES[gpMapStep];
+
+      // For LEFT/RIGHT, allow tilting any analog axis to skip — pollGamepad
+      // scans every even axis in-game, so we don't care which one the user
+      // wiggled. Mapping stays -1 (sentinel meaning "use the analog stick").
+      if (curStep === 'left' || curStep === 'right') {
+        let strongest = 0;
+        for (let i = 0; i < gp.axes.length; i += 2) {
+          let v = gp.axes[i];
+          if (typeof v === 'number' && !isNaN(v) && abs(v) > abs(strongest)) {
+            strongest = v;
+          }
+        }
+        let tilted = (curStep === 'left' && strongest < -0.7) ||
+                     (curStep === 'right' && strongest > 0.7);
+        if (tilted) {
+          gpMapping[curStep] = -1; // sentinel: use joystick
           gpMapStep++;
           gpMapCooldown = 30;
-          if (gpMapStep >= GP_MAP_NAMES.length) {
-            gpMapped = true;
-          }
-          break;
         }
       }
+
+      // Otherwise wait for a button press
+      if (gpMapStep < GP_MAP_NAMES.length && gpMapCooldown <= 0) {
+        for (let i = 0; i < gp.buttons.length; i++) {
+          let wasPressed = gpLastButtons[i] || false;
+          let isPressed = gp.buttons[i].pressed;
+          if (isPressed && !wasPressed) {
+            gpMapping[GP_MAP_NAMES[gpMapStep]] = i;
+            gpMapStep++;
+            gpMapCooldown = 30;
+            if (gpMapStep >= GP_MAP_NAMES.length) {
+              gpMapped = true;
+            }
+            break;
+          }
+        }
+      }
+
+      if (gpMapStep >= GP_MAP_NAMES.length) {
+        gpMapped = true;
+      }
+
       // Update button state snapshot
       for (let i = 0; i < gp.buttons.length; i++) {
         gpLastButtons[i] = gp.buttons[i].pressed;
@@ -216,11 +256,16 @@ function drawControllerConnect() {
   fill(50, 255, 100);
   text('Controller ready!', width / 2, 130);
 
-  textSize(16);
+  textSize(13);
   fill(200);
-  text('MOVE:  Joystick left/right', width / 2, 190);
-  text('JUMP:  Button ' + gpMapping.jump, width / 2, 220);
-  text('RESTART:  Button ' + gpMapping.start, width / 2, 250);
+  let fmtBtn = (v) => v < 0 ? 'Joystick' : ('Button ' + v);
+  text('LEFT:  ' + fmtBtn(gpMapping.left), width / 2, 165);
+  text('RIGHT:  ' + fmtBtn(gpMapping.right), width / 2, 183);
+  text('JUMP:  Button ' + gpMapping.jump, width / 2, 201);
+  text('YOSHI EAT:  Button ' + gpMapping.eat, width / 2, 219);
+  text('GET OFF YOSHI:  Button ' + gpMapping.dismount, width / 2, 237);
+  text('CALL YOSHI:  Button ' + gpMapping.callYoshi, width / 2, 255);
+  text('RESTART:  Button ' + gpMapping.start, width / 2, 273);
 
   // Live test display
   if (gp) {
@@ -228,7 +273,14 @@ function drawControllerConnect() {
     fill(150);
     text('-- Live test --', width / 2, 300);
 
-    let axisX = gp.axes[0] || 0;
+    // Use the same multi-axis scan + d-pad/button fallbacks as in-game
+    let axisX = readGamepadAxisX(gp);
+    let dpadL = gp.buttons[14] && gp.buttons[14].pressed;
+    let dpadR = gp.buttons[15] && gp.buttons[15].pressed;
+    let mappedL = gpMapping.left >= 0 && gp.buttons[gpMapping.left] && gp.buttons[gpMapping.left].pressed;
+    let mappedR = gpMapping.right >= 0 && gp.buttons[gpMapping.right] && gp.buttons[gpMapping.right].pressed;
+    let goingLeft = axisX < -STICK_DEADZONE || dpadL || mappedL;
+    let goingRight = axisX > STICK_DEADZONE || dpadR || mappedR;
     let jumpBtn = gp.buttons[gpMapping.jump] && gp.buttons[gpMapping.jump].pressed;
     let startBtn = gp.buttons[gpMapping.start] && gp.buttons[gpMapping.start].pressed;
 
@@ -239,17 +291,20 @@ function drawControllerConnect() {
     fill(60);
     noStroke();
     rect(barX, testY, barW, 20, 5);
-    // Joystick position dot
-    let dotX = width / 2 + axisX * (barW / 2);
-    fill(abs(axisX) > STICK_DEADZONE ? color(50, 255, 100) : color(150));
+    // Position dot reflects analog tilt or full-deflection if buttons used
+    let visX = axisX;
+    if (mappedL || dpadL) visX = -1;
+    if (mappedR || dpadR) visX = 1;
+    let dotX = width / 2 + visX * (barW / 2);
+    fill(goingLeft || goingRight ? color(50, 255, 100) : color(150));
     ellipse(dotX, testY + 10, 16, 16);
 
     // Direction label
     textSize(14);
     fill(255);
-    if (axisX < -STICK_DEADZONE) {
+    if (goingLeft) {
       text('LEFT', width / 2, testY + 45);
-    } else if (axisX > STICK_DEADZONE) {
+    } else if (goingRight) {
       text('RIGHT', width / 2, testY + 45);
     } else {
       fill(100);

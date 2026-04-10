@@ -42,9 +42,57 @@ function drawOverlay(title, subtitle) {
   fill(255);
   textAlign(CENTER, CENTER);
   textSize(36);
-  text(title, width / 2, height / 2 - 20);
-  textSize(18);
-  text(subtitle, width / 2, height / 2 + 25);
+  text(title, width / 2, height / 2 - 60);
+
+  if (useController && gpMapped) {
+    drawOverlayButtons();
+  } else {
+    textSize(18);
+    text(subtitle, width / 2, height / 2 - 5);
+  }
+}
+
+function drawOverlayButtons() {
+  let opts = getOverlayOptions();
+  if (opts.length === 0) return;
+
+  let btnW = 200;
+  let btnH = 56;
+  let gap = 30;
+  let totalW = opts.length * btnW + (opts.length - 1) * gap;
+  let startX = width / 2 - totalW / 2;
+  let btnY = height / 2 + 10;
+
+  for (let i = 0; i < opts.length; i++) {
+    let bx = startX + i * (btnW + gap);
+    let selected = (i === overlayChoice);
+
+    noStroke();
+    fill(selected ? color(255, 220, 50) : color(60));
+    rect(bx, btnY, btnW, btnH, 10);
+
+    if (selected) {
+      stroke(255, 220, 50);
+      strokeWeight(3);
+      noFill();
+      rect(bx - 4, btnY - 4, btnW + 8, btnH + 8, 12);
+      noStroke();
+    }
+
+    fill(selected ? 0 : 255);
+    textSize(22);
+    textAlign(CENTER, CENTER);
+    text(opts[i].label, bx + btnW / 2, btnY + btnH / 2);
+  }
+
+  fill(180);
+  textSize(13);
+  textAlign(CENTER, CENTER);
+  if (opts.length > 1) {
+    text('Joystick / D-pad: navigate     JUMP: confirm', width / 2, btnY + btnH + 28);
+  } else {
+    text('Press JUMP to confirm', width / 2, btnY + btnH + 28);
+  }
 }
 
 // ── Level drawing ──

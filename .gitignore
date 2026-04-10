@@ -3,3 +3,9 @@
 libraries/
 node_modules/
 *.log
+
+# Unused reference assets (kept locally, not shipped)
+assets/Control chart.jpeg
+assets/Yoshi eating enemy.webp
+assets/super-mario-world-yoshi.gif
+assets/nintendo switch 2 pro controller image.jpg

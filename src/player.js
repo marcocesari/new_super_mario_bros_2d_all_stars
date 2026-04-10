@@ -27,7 +27,7 @@ function createPlayer(spawnCol) {
     big: false,
     invincible: 0,
     growing: false,
-    gpMoving: false,
+    gpMoveDir: 0,
     growTimer: 0,
     respawnTimer: 0,
     ridingYoshi: null,
@@ -51,9 +51,12 @@ function resetPlayers() {
 
 function getPlayerInput(player) {
   if (player === mario) {
-    let left = keyIsDown(LEFT_ARROW) || (useController && keyIsDown(padMapping.left));
-    let right = keyIsDown(RIGHT_ARROW) || (useController && keyIsDown(padMapping.right));
-    return { left, right };
+    // Gamepad joystick is handled separately in pollGamepad (it writes
+    // player.vx directly), so here we only need the keyboard arrows.
+    return {
+      left: keyIsDown(LEFT_ARROW),
+      right: keyIsDown(RIGHT_ARROW),
+    };
   } else {
     return { left: keyIsDown(KEY_A), right: keyIsDown(KEY_D) };
   }
@@ -63,28 +66,26 @@ function getPlayerInput(player) {
 
 function updatePlayer(player) {
   let input = getPlayerInput(player);
-  let moving = false;
-  let spd = player.ridingYoshi ? 4.5 : player.speed;
+  let spd = player.ridingYoshi ? RIDING_SPEED : player.speed;
 
-  if (input.left) {
-    player.vx = -spd;
-    player.facing = -1;
-    moving = true;
-  } else if (input.right) {
-    player.vx = spd;
-    player.facing = 1;
-    moving = true;
-  } else {
-    player.vx = 0;
+  // Combine keyboard + gamepad into one direction (-1, 0, 1).
+  // Single source of truth for movement, so keyboard and controller use
+  // the exact same speed value — they cannot diverge.
+  let dir = 0;
+  if (input.left) dir = -1;
+  else if (input.right) dir = 1;
+
+  if (player === mario) {
+    pollGamepad(player); // updates player.gpMoveDir + handles buttons
+    if (player.gpMoveDir) dir = player.gpMoveDir;
   }
 
-  // Gamepad polling for Mario only
-  if (player === mario) {
-    pollGamepad(player);
-    if (player.gpMoving) moving = true;
-    if (!player.gpMoving && !input.left && !input.right) {
-      player.vx = 0;
-    }
+  let moving = dir !== 0;
+  if (moving) {
+    player.vx = dir * spd;
+    player.facing = dir;
+  } else {
+    player.vx = 0;
   }
 
   if (player.onGround) {
@@ -242,11 +243,12 @@ function drawPlayer(player, isLuigi) {
 
   if (isLuigi) tint(100, 255, 100);
 
-  // Draw Yoshi underneath if riding
+  // Draw ride sprite (Mario+Yoshi combined) and skip Mario drawing
   if (player.ridingYoshi) {
-    if (isLuigi) noTint(); // temporarily remove tint for Yoshi
+    if (isLuigi) noTint();
     drawRidingYoshi(player);
-    if (isLuigi) tint(100, 255, 100);
+    if (isLuigi) noTint();
+    return;
   }
 
   if (player.growing) {

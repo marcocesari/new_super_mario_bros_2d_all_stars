@@ -116,17 +116,15 @@ function checkEnemyCollisionsFor(player) {
     let stomping = player.vy > 0 && playerBottom < enemyMid + 4;
 
     if (player.ridingYoshi) {
-      if (keyIsDown(SHIFT) || keyIsDown(16)) {
-        // Shift held: Yoshi eats enemy
-        enemy.alive = false;
-        game.score += 200;
-        player.ridingYoshi.eating = 20;
-      } else if (stomping) {
+      if (stomping) {
         // Jump on enemy: normal stomp
         stompEnemy(enemy);
         player.vy = STOMP_BOUNCE;
+      } else if (player.big) {
+        // Big Mario on Yoshi: shrink back to small, keep Yoshi
+        shrinkPlayer(player);
       } else {
-        // Side hit: lose Yoshi, Mario continues
+        // Small Mario on Yoshi: lose Yoshi, Mario continues
         dismountYoshi(player);
         player.invincible = INVINCIBILITY_FRAMES;
       }

@@ -22,6 +22,27 @@ const YOSHI_FRAMES = {
 
 const YOSHI_DRAW_W = 80;
 const YOSHI_DRAW_H = 88;
+const YOSHI_FEET_OFFSET = 8; // nudge Yoshi down so feet touch ground
+
+// Mario-on-Yoshi ride sprite (3 frames, each 200x200 in mario_on_yoshi.png)
+const RIDE_DRAW_SIZE = 105;
+const RIDE_FRAMES = [
+  { x: 0, y: 0, w: 200, h: 200 },
+  { x: 200, y: 0, w: 200, h: 200 },
+  { x: 400, y: 0, w: 200, h: 200 },
+];
+
+// Mario-on-Yoshi eating sprite (6 frames, each 256x256 in yoshi_eating.png)
+const EAT_DRAW_SIZE = 180; // scaled up to match ride character size
+const EAT_BODY_OFFSET = 50; // shift to keep body aligned (body is left-side of eat frames)
+const EAT_ANIM_FRAMES = [
+  { x: 0, y: 0, w: 256, h: 256 },
+  { x: 256, y: 0, w: 256, h: 256 },
+  { x: 512, y: 0, w: 256, h: 256 },
+  { x: 768, y: 0, w: 256, h: 256 },
+  { x: 1024, y: 0, w: 256, h: 256 },
+  { x: 1280, y: 0, w: 256, h: 256 },
+];
 
 // ── Yoshi egg block hit ──
 
@@ -94,19 +115,20 @@ function drawYoshiEggs() {
     if (!e.alive) continue;
     let sx = e.worldX - cameraX;
 
+    let eggScale = 3;
     if (e.hatching) {
       // Draw hatching animation from sprite sheet
       let f = YOSHI_FRAMES.hatch[e.hatchFrame];
-      let drawW = f.w * 1.5;
-      let drawH = f.h * 1.5;
+      let drawW = f.w * eggScale;
+      let drawH = f.h * eggScale;
       let shake = e.hatchTimer < 30 ? floor(random(-2, 3)) : 0;
-      image(yoshiSheet, sx + shake, e.worldY + 36 - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
+      image(yoshiSheet, sx + shake, e.worldY + 50 - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
     } else {
       // Draw first hatch frame as the egg
       let f = YOSHI_FRAMES.hatch[0];
-      let drawW = f.w * 1.5;
-      let drawH = f.h * 1.5;
-      image(yoshiSheet, sx, e.worldY + 36 - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
+      let drawW = f.w * eggScale;
+      let drawH = f.h * eggScale;
+      image(yoshiSheet, sx, e.worldY + 50 - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
     }
   }
 }
@@ -126,6 +148,7 @@ function createYoshi(worldX, worldY) {
     animFrame: 0,
     animTimer: 0,
     eating: 0,
+    eatTimer: 0,
     ox: 6,
     oy: 6,
     hw: 42,
@@ -172,6 +195,73 @@ function checkYoshiMountFor(player) {
   }
 }
 
+// ── Yoshi eat (extended range in facing direction) ──
+
+const YOSHI_EAT_RANGE = 120;
+
+function isEatButtonHeld() {
+  // Keyboard: shift key
+  if (keyIsDown(SHIFT) || keyIsDown(16)) return true;
+  // Controller: mapped eat button
+  if (useController && gpMapped && gpMapping.eat >= 0) {
+    let gp = getGamepad();
+    if (gp && gp.buttons[gpMapping.eat] && gp.buttons[gpMapping.eat].pressed) return true;
+  }
+  return false;
+}
+
+// Full eat animation cycle: 6 frames × 3 ticks = 18 ticks.
+// The tongue is fully extended around frame 3 (~tick 9 of the cycle).
+const YOSHI_EAT_CYCLE = 18;
+const YOSHI_EAT_CONTACT_START = 9;  // tongue first reaches enemies
+const YOSHI_EAT_CONTACT_END = 15;   // tongue starts retracting
+
+function yoshiTryEat(player) {
+  let y = player.ridingYoshi;
+  if (!y) return;
+
+  // Begin a new eat cycle on a fresh button press (don't restart mid-cycle).
+  if (isEatButtonHeld() && y.eating <= 0) {
+    y.eating = YOSHI_EAT_CYCLE;
+    y.ateThisCycle = false;
+  }
+
+  if (y.eating <= 0) return;
+
+  // While the tongue is out, scan every frame for enemies in range. We
+  // don't lock a target at button-press time because the enemy may walk
+  // into range *during* the cycle. Eat at most one enemy per cycle.
+  let elapsed = YOSHI_EAT_CYCLE - y.eating;
+  if (y.ateThisCycle) return;
+  if (elapsed < YOSHI_EAT_CONTACT_START || elapsed > YOSHI_EAT_CONTACT_END) return;
+
+  let px = player.worldX + player.ox + player.hw / 2;
+  let py = player.worldY + player.oy + player.hh / 2;
+
+  let bestEnemy = null;
+  let bestDist = Infinity;
+  for (let enemy of enemies) {
+    if (!enemy.alive || enemy.state === 'stomped') continue;
+    let ex = enemy.worldX + enemy.ox + enemy.hw / 2;
+    let ey = enemy.worldY + enemy.oy + enemy.hh / 2;
+    let dx = ex - px;
+    let dy = abs(ey - py);
+    if (dy >= TILE_DRAW || abs(dx) >= YOSHI_EAT_RANGE) continue;
+    if (player.facing === 1 && dx <= -20) continue;
+    if (player.facing === -1 && dx >= 20) continue;
+    if (abs(dx) < bestDist) {
+      bestDist = abs(dx);
+      bestEnemy = enemy;
+    }
+  }
+
+  if (bestEnemy) {
+    bestEnemy.alive = false;
+    game.score += 200;
+    y.ateThisCycle = true;
+  }
+}
+
 // ── Draw a Yoshi sprite ──
 
 function drawYoshiSprite(sx, sy, facing, frames, animFrame) {
@@ -183,7 +273,7 @@ function drawYoshiSprite(sx, sy, facing, frames, animFrame) {
   let drawW = f.w * refScale;
   let drawH = f.h * refScale;
   push();
-  translate(sx + YOSHI_DRAW_W / 2, sy + YOSHI_DRAW_H - drawH);
+  translate(sx + YOSHI_DRAW_W / 2, sy + YOSHI_DRAW_H - drawH + YOSHI_FEET_OFFSET);
   scale(facing, 1);
   image(yoshiSheet, -drawW / 2, 0, drawW, drawH, f.x, f.y, f.w, f.h);
   pop();
@@ -204,7 +294,8 @@ function drawYoshis() {
     }
 
     let frames = YOSHI_FRAMES.idle;
-    drawYoshiSprite(sx, y.worldY, y.facing, frames, 0);
+    let feetY = y.worldY + y.oy + y.hh;
+    drawYoshiSprite(sx, feetY - YOSHI_DRAW_H, y.facing, frames, 0);
   }
 }
 
@@ -217,36 +308,96 @@ function drawRidingYoshi(player) {
   // Animate walk (fast cycle)
   if (player.state === 'walk') {
     y.animTimer++;
-    if (y.animTimer >= 7) {
+    if (y.animTimer >= 3) {
       y.animTimer = 0;
-      y.animFrame = (y.animFrame + 1) % YOSHI_FRAMES.walk.length;
+      y.animFrame = (y.animFrame + 1) % RIDE_FRAMES.length;
     }
   } else {
     y.animFrame = 0;
     y.animTimer = 0;
   }
 
-  // Pick frame set
-  let frames;
-  if (y.eating > 0) {
-    frames = YOSHI_FRAMES.eat;
-  } else if (player.state === 'walk') {
-    frames = YOSHI_FRAMES.walk;
-  } else {
-    frames = YOSHI_FRAMES.idle;
-  }
+  // Align feet with ground
+  let playerFeetY = player.worldY + player.oy + player.hh;
+  let drawSize = RIDE_DRAW_SIZE;
+  let drawY = playerFeetY - drawSize + YOSHI_FEET_OFFSET;
+  let drawX = sx - (drawSize - SPRITE_STRIDE * SCALE) / 2;
 
-  let yoshiY = player.worldY + (player.big ? 50 : 24);
-  drawYoshiSprite(sx, yoshiY, player.facing, frames, y.animFrame);
+  if (y.eating > 0) {
+    // Eating: drive the animation from the eat-cycle countdown so the tongue
+    // visibly extends before the enemy is consumed (contact at ~frame 3).
+    let elapsed = YOSHI_EAT_CYCLE - y.eating;
+    let eatFrame = constrain(floor(elapsed / 3), 0, EAT_ANIM_FRAMES.length - 1);
+    let ef = EAT_ANIM_FRAMES[eatFrame];
+    let eatSize = EAT_DRAW_SIZE;
+    // Align feet: eat sprite has ~60/256 padding below feet
+    let eatFeetOffset = 60 * eatSize / 256;
+    let eatY = playerFeetY - eatSize + eatFeetOffset + YOSHI_FEET_OFFSET;
+    // Anchor body position (body is on the left side of eat frames)
+    let centerX = sx + SPRITE_STRIDE * SCALE / 2;
+    push();
+    translate(centerX, eatY);
+    scale(player.facing, 1);
+    image(eatSheet, -eatSize / 2 + EAT_BODY_OFFSET, 0, eatSize, eatSize, ef.x, ef.y, ef.w, ef.h);
+    pop();
+  } else {
+    // Normal: draw ride sprite (Mario + Yoshi together)
+    let rf = RIDE_FRAMES[y.animFrame % RIDE_FRAMES.length];
+    push();
+    translate(drawX + drawSize / 2, drawY);
+    scale(player.facing, 1);
+    image(rideSheet, -drawSize / 2, 0, drawSize, drawSize, rf.x, rf.y, rf.w, rf.h);
+    pop();
+  }
 }
 
-// ── Dismount (on death) ──
+// ── Dismount (on death — Yoshi runs off and is gone) ──
 
 function dismountYoshi(player) {
   if (!player.ridingYoshi) return;
   player.ridingYoshi.mounted = false;
   player.ridingYoshi.alive = false;
   player.ridingYoshi = null;
+}
+
+// ── Voluntary dismount — Yoshi stays alive next to the player ──
+
+function dismountYoshiVoluntary(player) {
+  if (!player.ridingYoshi) return;
+  let y = player.ridingYoshi;
+  y.mounted = false;
+  // Place Yoshi just behind the player so we don't immediately re-mount
+  y.worldX = player.worldX + (player.facing === 1 ? -TILE_DRAW : TILE_DRAW);
+  y.worldY = player.worldY;
+  y.vx = 0;
+  y.vy = 0;
+  y.eating = 0;
+  y.tongueTarget = null;
+  player.ridingYoshi = null;
+}
+
+// ── Call Yoshi — summon the nearest unmounted Yoshi to the player ──
+
+function callYoshiToPlayer(player) {
+  if (player.dead || player.ridingYoshi) return;
+  let nearest = null;
+  let nearestDist = Infinity;
+  for (let y of yoshis) {
+    if (!y.alive || y.mounted) continue;
+    let d = abs(y.worldX - player.worldX);
+    if (d < nearestDist) {
+      nearestDist = d;
+      nearest = y;
+    }
+  }
+  if (!nearest) return;
+  // Teleport Yoshi onto the player and mount instantly.
+  nearest.worldX = player.worldX;
+  nearest.worldY = player.worldY;
+  nearest.vx = 0;
+  nearest.vy = 0;
+  nearest.mounted = true;
+  player.ridingYoshi = nearest;
 }
 
 // ── Reset ──

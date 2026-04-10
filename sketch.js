@@ -1,7 +1,7 @@
 // ── Global state ──
 
 // Sprite sheets
-let marioSheet, blocksSheet, enemiesSheet, yoshiSheet;
+let marioSheet, blocksSheet, enemiesSheet, yoshiSheet, rideSheet, eatSheet;
 
 // Sounds (keyed for easy iteration in stopAllSounds)
 let sounds = {
@@ -55,6 +55,8 @@ function preload() {
   blocksSheet = loadImage('assets/blocks.png');
   enemiesSheet = loadImage('assets/enemies.png');
   yoshiSheet = loadImage('assets/images of Yoshi.png');
+  rideSheet = loadImage('assets/mario_on_yoshi.png');
+  eatSheet = loadImage('assets/yoshi_eating.png');
   sounds.music = loadSound('assets/01. Ground Theme.mp3');
   sounds.music2 = loadSound('assets/02 Player Select.mp3');
   sounds.music3 = loadSound('assets/09. Overworld.mp3');
@@ -106,6 +108,7 @@ function draw() {
       for (let p of players) {
         if (!p.dead) {
           checkYoshiMountFor(p);
+          yoshiTryEat(p);
           checkEnemyCollisionsFor(p);
           checkMushroomCollectionFor(p);
         }
@@ -148,14 +151,17 @@ function draw() {
 
   if (game.state === 'levelComplete') {
     levelCompleteTimer--;
+    pollOverlayControls();
     if (game.currentLevel < LEVELS.length - 1) {
       drawOverlay('WORLD ' + LEVEL_THEMES[game.currentLevel].name + ' CLEAR!', 'Press SPACE for next level');
     } else {
       drawOverlay('YOU WIN!', 'Final score: ' + game.score + '  |  Press R to play again');
     }
   } else if (game.state === 'dead') {
+    pollOverlayControls();
     drawOverlay('YOU DIED!', 'Press R to retry (' + game.lives + ' lives left)');
   } else if (game.state === 'gameover') {
+    pollOverlayControls();
     drawOverlay('GAME OVER', 'Press R to restart');
   }
 }
