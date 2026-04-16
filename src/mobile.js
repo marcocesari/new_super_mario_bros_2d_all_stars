@@ -13,14 +13,15 @@ let _prevTouchAction = false;
 let _prevTouchDismount = false;
 let _prevTouchCall = false;
 
-// Joystick state. The base ring sits at a fixed position on the bottom-left
-// and is always visible; the knob tracks whichever finger is holding it (by
-// touch id) and returns to centre on release.
+// Joystick state. Spawns at the first non-button touch, anchors there, and
+// tracks the knob relative to that anchor. Hidden otherwise.
 let _joystick = {
   active: false,
   id: -1,
-  dx: 0, // knob offset from base centre (clamped to baseR)
-  dy: 0,
+  startX: 0,
+  startY: 0,
+  curX: 0,
+  curY: 0,
 };
 
 // ── First-gesture handling ────────────────────────────────────────────────
@@ -78,34 +79,33 @@ function drawRotatePrompt() {
 }
 
 // ── On-screen touch controls ──────────────────────────────────────────────
-// Right side: Nintendo face-button diamond (X top, Y left, A right, B bottom).
-// Left side: virtual joystick that spawns wherever the player's thumb lands.
+// Right side: A (big, jump) plus smaller X / Y / B around it.
+// Left side: virtual joystick that spawns under the player's thumb.
 
 function getTouchButtonLayout() {
   let shortEdge = min(width, height);
-  let btnR = max(32, min(60, shortEdge * 0.075));
-  let spacing = btnR * 1.9; // distance from diamond centre to each button
+  let aR = max(54, min(92, shortEdge * 0.12));     // A — big primary (jump)
+  let smallR = aR * 0.58;                           // X, Y, B — secondary
   let pad = max(18, shortEdge * 0.04);
 
-  // Diamond centre — pulled inward from the right edge so A sits
-  // comfortably under the thumb instead of against the screen edge.
-  let diamondCX = width - pad - btnR - spacing;
-  let diamondCY = height - pad - btnR - spacing;
+  // A anchored on the bottom-right, with room above/left for X, Y, B.
+  let aCX = width - pad - aR - smallR * 0.4;
+  let aCY = height - pad - aR;
 
-  // Always-visible joystick anchored on the bottom-left.
-  let baseR = max(50, min(90, shortEdge * 0.11));
-  let knobR = baseR * 0.45;
-  let jCX = pad + baseR;
-  let jCY = height - pad - baseR;
+  // X: above-left of A, Y: above-right of A, B: left of A (slightly down).
+  let xCX = aCX - aR * 0.75 - smallR * 0.2;
+  let xCY = aCY - aR - smallR * 0.4;
+  let yCX = aCX + aR * 0.75 + smallR * 0.2;
+  let yCY = xCY;
+  let bCX = aCX - aR - smallR * 1.2;
+  let bCY = aCY + aR * 0.25;
 
   return {
-    btnR, spacing,
-    diamondCX, diamondCY,
-    aCX: diamondCX + spacing, aCY: diamondCY,             // right
-    bCX: diamondCX,           bCY: diamondCY + spacing,   // bottom
-    xCX: diamondCX,           xCY: diamondCY - spacing,   // top
-    yCX: diamondCX - spacing, yCY: diamondCY,             // left
-    jCX, jCY, baseR, knobR,
+    aR, smallR,
+    aCX, aCY,
+    bCX, bCY,
+    xCX, xCY,
+    yCX, yCY,
   };
 }
 
@@ -117,8 +117,25 @@ function _touchInCircle(cx, cy, r) {
   return false;
 }
 
+// Is a touch inside any face button (with a small grace margin)? The
+// joystick ignores these so tapping A doesn't also start a drag.
+function _isTouchOnFaceButton(tx, ty, L) {
+  let margin = 1.15;
+  let buttons = [
+    [L.aCX, L.aCY, L.aR * margin],
+    [L.bCX, L.bCY, L.smallR * margin],
+    [L.xCX, L.xCY, L.smallR * margin],
+    [L.yCX, L.yCY, L.smallR * margin],
+  ];
+  for (let b of buttons) {
+    let dx = tx - b[0], dy = ty - b[1];
+    if (dx * dx + dy * dy <= b[2] * b[2]) return true;
+  }
+  return false;
+}
+
 function _updateVirtualJoystick(L) {
-  // Keep the tracked finger's position mirrored onto the knob.
+  // Keep tracking the existing finger if it's still on screen.
   if (_joystick.active) {
     let tracked = null;
     for (let t of touches) {
@@ -126,47 +143,36 @@ function _updateVirtualJoystick(L) {
     }
     if (!tracked) {
       _joystick.active = false;
-      _joystick.dx = 0;
-      _joystick.dy = 0;
     } else {
-      let dx = tracked.x - L.jCX;
-      let dy = tracked.y - L.jCY;
-      let d = sqrt(dx * dx + dy * dy);
-      if (d > L.baseR) { dx = dx / d * L.baseR; dy = dy / d * L.baseR; }
-      _joystick.dx = dx;
-      _joystick.dy = dy;
+      _joystick.curX = tracked.x;
+      _joystick.curY = tracked.y;
     }
   }
 
-  // Acquire: any touch landing within a generous grab area around the base
-  // claims the joystick. The face buttons sit on the far right, so they
-  // can't accidentally overlap this zone.
+  // Acquire: the first active touch that isn't on a face button spawns the
+  // joystick anchored at its landing position.
   if (!_joystick.active) {
-    let grabR = L.baseR * 2;
-    let grabR2 = grabR * grabR;
     for (let t of touches) {
-      let dx = t.x - L.jCX;
-      let dy = t.y - L.jCY;
-      if (dx * dx + dy * dy <= grabR2) {
+      if (!_isTouchOnFaceButton(t.x, t.y, L)) {
         _joystick.active = true;
         _joystick.id = t.id;
-        let d = sqrt(dx * dx + dy * dy);
-        if (d > L.baseR) { dx = dx / d * L.baseR; dy = dy / d * L.baseR; }
-        _joystick.dx = dx;
-        _joystick.dy = dy;
+        _joystick.startX = t.x;
+        _joystick.startY = t.y;
+        _joystick.curX = t.x;
+        _joystick.curY = t.y;
         break;
       }
     }
   }
 
-  // Horizontal knob offset → left/right movement (with deadzone).
-  let deadzone = L.baseR * 0.22;
-  if (_joystick.dx > deadzone) {
-    touchLeftHeld = false;
-    touchRightHeld = true;
-  } else if (_joystick.dx < -deadzone) {
-    touchLeftHeld = true;
-    touchRightHeld = false;
+  // Horizontal offset → left/right movement.
+  if (_joystick.active) {
+    let shortEdge = min(width, height);
+    let deadzone = max(8, shortEdge * 0.02);
+    let dx = _joystick.curX - _joystick.startX;
+    if (dx > deadzone) { touchLeftHeld = false; touchRightHeld = true; }
+    else if (dx < -deadzone) { touchLeftHeld = true; touchRightHeld = false; }
+    else { touchLeftHeld = false; touchRightHeld = false; }
   } else {
     touchLeftHeld = false;
     touchRightHeld = false;
@@ -183,17 +189,15 @@ function updateTouchControls() {
     _prevTouchDismount = false;
     _prevTouchCall = false;
     _joystick.active = false;
-    _joystick.dx = 0;
-    _joystick.dy = 0;
     return;
   }
 
   let L = getTouchButtonLayout();
 
-  let jumpHeld     = _touchInCircle(L.aCX, L.aCY, L.btnR);
-  let actionHeld   = _touchInCircle(L.bCX, L.bCY, L.btnR);
-  let dismountHeld = _touchInCircle(L.xCX, L.xCY, L.btnR);
-  let callHeld     = _touchInCircle(L.yCX, L.yCY, L.btnR);
+  let jumpHeld     = _touchInCircle(L.aCX, L.aCY, L.aR);
+  let actionHeld   = _touchInCircle(L.bCX, L.bCY, L.smallR);
+  let dismountHeld = _touchInCircle(L.xCX, L.xCY, L.smallR);
+  let callHeld     = _touchInCircle(L.yCX, L.yCY, L.smallR);
 
   // A — Jump (rising edge)
   if (jumpHeld && !_prevTouchJump && mario && !mario.dead && !mario.growing && mario.onGround) {
@@ -234,50 +238,67 @@ function drawTouchControls() {
   noStroke();
   textAlign(CENTER, CENTER);
 
-  // Always-visible joystick — translucent base + coloured knob.
-  fill(255, 255, 255, 55);
-  ellipse(L.jCX, L.jCY, L.baseR * 2);
-  stroke(255, 255, 255, 180);
-  strokeWeight(2);
-  noFill();
-  ellipse(L.jCX, L.jCY, L.baseR * 2);
-  noStroke();
+  // Joystick — only visible while a finger is on the movement zone.
+  if (_joystick.active) {
+    let maxR = max(36, min(width, height) * 0.09);
+    let dx = _joystick.curX - _joystick.startX;
+    let dy = _joystick.curY - _joystick.startY;
+    let d = sqrt(dx * dx + dy * dy);
+    if (d > maxR) { dx = dx / d * maxR; dy = dy / d * maxR; }
 
-  // Knob (brighter while held, like Brawl Stars).
-  fill(80, 140, 220, _joystick.active ? 240 : 200);
-  ellipse(L.jCX + _joystick.dx, L.jCY + _joystick.dy, L.knobR * 2);
-  fill(255, 255, 255, 140);
-  ellipse(L.jCX + _joystick.dx - L.knobR * 0.25,
-          L.jCY + _joystick.dy - L.knobR * 0.25,
-          L.knobR * 0.7);
+    // Base ring
+    fill(255, 255, 255, 55);
+    ellipse(_joystick.startX, _joystick.startY, maxR * 2);
+    stroke(255, 255, 255, 180);
+    strokeWeight(2);
+    noFill();
+    ellipse(_joystick.startX, _joystick.startY, maxR * 2);
+    noStroke();
 
-  // Face-button diamond
-  // A (right, green) — Jump
-  fill(100, 220, 120, _prevTouchJump ? 230 : 160);
-  ellipse(L.aCX, L.aCY, L.btnR * 2);
-  fill(0, 0, 0, 220);
-  textSize(L.btnR * 0.95);
-  text('A', L.aCX, L.aCY);
+    // Knob with highlight
+    let knobR = maxR * 0.5;
+    fill(80, 140, 220, 240);
+    ellipse(_joystick.startX + dx, _joystick.startY + dy, knobR * 2);
+    fill(255, 255, 255, 150);
+    ellipse(_joystick.startX + dx - knobR * 0.3,
+            _joystick.startY + dy - knobR * 0.3,
+            knobR * 0.8);
+  }
 
-  // B (bottom, red) — Eat / call Yoshi
-  fill(230, 80, 80, touchActionHeld ? 230 : 160);
-  ellipse(L.bCX, L.bCY, L.btnR * 2);
-  fill(0, 0, 0, 220);
-  text('B', L.bCX, L.bCY);
-
-  // X (top, blue) — Dismount Yoshi
-  fill(80, 150, 230, _prevTouchDismount ? 230 : 160);
-  ellipse(L.xCX, L.xCY, L.btnR * 2);
-  fill(0, 0, 0, 220);
-  text('X', L.xCX, L.xCY);
-
-  // Y (left, yellow) — Call Yoshi
-  fill(240, 210, 60, _prevTouchCall ? 230 : 160);
-  ellipse(L.yCX, L.yCY, L.btnR * 2);
-  fill(0, 0, 0, 220);
-  text('Y', L.yCX, L.yCY);
+  // Face buttons — colourful, with a soft top highlight for a 3D feel.
+  _drawFaceButton(L.aCX, L.aCY, L.aR, 'A', [80, 210, 110], _prevTouchJump);
+  _drawFaceButton(L.bCX, L.bCY, L.smallR, 'B', [230, 80, 90], touchActionHeld);
+  _drawFaceButton(L.xCX, L.xCY, L.smallR, 'X', [80, 150, 230], _prevTouchDismount);
+  _drawFaceButton(L.yCX, L.yCY, L.smallR, 'Y', [245, 205, 60], _prevTouchCall);
 
   pop();
+}
+
+function _drawFaceButton(cx, cy, r, label, rgb, held) {
+  // Drop shadow for depth
+  noStroke();
+  fill(0, 0, 0, 90);
+  ellipse(cx + 1, cy + 3, r * 2);
+
+  // Dark rim so the colour pops against any background
+  fill(0, 0, 0, 180);
+  ellipse(cx, cy, r * 2.08);
+
+  // Main body — a touch brighter while held
+  let boost = held ? 35 : 0;
+  fill(min(255, rgb[0] + boost), min(255, rgb[1] + boost), min(255, rgb[2] + boost), 245);
+  ellipse(cx, cy, r * 2);
+
+  // Top highlight (gives a glossy, 3D button feel)
+  fill(255, 255, 255, held ? 70 : 110);
+  ellipse(cx - r * 0.25, cy - r * 0.3, r * 1.05, r * 0.75);
+
+  // Label
+  fill(0, 0, 0, 230);
+  textSize(r * 0.95);
+  textStyle(BOLD);
+  text(label, cx, cy);
+  textStyle(NORMAL);
 }
 
 // Called on any touch while game is NOT in 'playing'. Collapses the menus
