@@ -88,9 +88,13 @@ function getTouchButtonLayout() {
   let smallR = aR * 0.58;                           // X, Y, B — secondary
   let pad = max(18, shortEdge * 0.04);
 
-  // A anchored on the bottom-right, with room above/left for X, Y, B.
-  let aCX = width - pad - aR - smallR * 0.4;
-  let aCY = height - pad - aR;
+  // A lifted off the corner — sits in the lower-right quadrant roughly
+  // 25% off the bottom edge and 10% off the right edge, like the aim
+  // button in Brawl Stars rather than pinned to the screen corner.
+  let bottomMargin = max(pad + aR * 0.5, height * 0.25);
+  let rightMargin  = max(pad + smallR,    width  * 0.10);
+  let aCX = width  - rightMargin  - aR;
+  let aCY = height - bottomMargin - aR;
 
   // X: above-left of A, Y: above-right of A, B: left of A (slightly down).
   let xCX = aCX - aR * 0.75 - smallR * 0.2;
