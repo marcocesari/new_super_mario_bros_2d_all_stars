@@ -230,7 +230,25 @@ function playLevelMusic() {
 
   activeLevelMusic = levelMusic;
   levelMusic.setVolume(0.5);
-  levelMusic.play();
+
+  // On iOS the AudioContext can still be 'suspended' the very first time
+  // we try to play music (userStartAudio resolves asynchronously). If so,
+  // resume the context first and retry play() once it's running — otherwise
+  // the .play() call is silently dropped and the user hears nothing.
+  let ctx = null;
+  try { ctx = getAudioContext(); } catch (e) { /* ignore */ }
+  if (ctx && ctx.state !== 'running' && typeof ctx.resume === 'function') {
+    let r = ctx.resume();
+    if (r && typeof r.then === 'function') {
+      r.then(() => {
+        if (activeLevelMusic === levelMusic) levelMusic.play();
+      }).catch(() => { levelMusic.play(); });
+    } else {
+      levelMusic.play();
+    }
+  } else {
+    levelMusic.play();
+  }
 
   // When the track finishes, wait a fixed 500 ms and restart it.
   levelMusic.onended(() => {

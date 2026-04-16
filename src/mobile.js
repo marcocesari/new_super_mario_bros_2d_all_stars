@@ -28,14 +28,29 @@ let _joystick = {
 // iOS won't resume the AudioContext, enter fullscreen, or lock orientation
 // without a user gesture. Called from touchStarted / mousePressed / keyPressed.
 
-let _gestureHandled = false;
-function handleFirstGesture() {
-  if (_gestureHandled) return;
-  _gestureHandled = true;
+// iOS Safari (especially as an installed PWA) sometimes leaves the
+// AudioContext in 'suspended' even after userStartAudio(), and can
+// re-suspend it after backgrounding the app. Running a resume on every
+// gesture — not just the first — keeps the context reliably 'running'.
+function tryResumeAudio() {
+  try {
+    let ctx = getAudioContext();
+    if (ctx && ctx.state !== 'running') {
+      let p = ctx.resume();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    }
+  } catch (e) { /* ignore */ }
   try {
     let p = userStartAudio();
     if (p && typeof p.catch === 'function') p.catch(() => {});
   } catch (e) { /* ignore */ }
+}
+
+let _gestureHandled = false;
+function handleFirstGesture() {
+  tryResumeAudio();
+  if (_gestureHandled) return;
+  _gestureHandled = true;
   // Fullscreen + landscape-lock only on touch devices — desktop users are
   // trusted to choose fullscreen via the browser (F11 / ⌃⌘F).
   if (isTouchDevice) {
