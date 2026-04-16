@@ -12,6 +12,7 @@ function updateCamera() {
   }
   if (!leader) leader = mario; // fallback
 
-  let targetX = leader.worldX - width / 3;
-  cameraX = constrain(targetX, 0, levelCols * TILE_DRAW - width);
+  let viewW = width / (viewScale || 1);
+  let targetX = leader.worldX - viewW / 3;
+  cameraX = constrain(targetX, 0, max(0, levelCols * TILE_DRAW - viewW));
 }

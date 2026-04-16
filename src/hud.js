@@ -98,8 +98,9 @@ function drawOverlayButtons() {
 // ── Level drawing ──
 
 function drawLevel() {
+  let viewW = width / (viewScale || 1);
   let startCol = floor(cameraX / TILE_DRAW);
-  let endCol = min(startCol + ceil(width / TILE_DRAW) + 1, levelCols);
+  let endCol = min(startCol + ceil(viewW / TILE_DRAW) + 1, levelCols);
 
   for (let r = 0; r < levelRows; r++) {
     for (let c = startCol; c <= endCol; c++) {

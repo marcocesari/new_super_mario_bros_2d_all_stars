@@ -52,10 +52,11 @@ function resetPlayers() {
 function getPlayerInput(player) {
   if (player === mario) {
     // Gamepad joystick is handled separately in pollGamepad (it writes
-    // player.vx directly), so here we only need the keyboard arrows.
+    // player.vx directly), so here we only need the keyboard arrows and
+    // the on-screen touch d-pad.
     return {
-      left: keyIsDown(LEFT_ARROW),
-      right: keyIsDown(RIGHT_ARROW),
+      left: keyIsDown(LEFT_ARROW) || touchLeftHeld,
+      right: keyIsDown(RIGHT_ARROW) || touchRightHeld,
     };
   } else {
     return { left: keyIsDown(KEY_A), right: keyIsDown(KEY_D) };

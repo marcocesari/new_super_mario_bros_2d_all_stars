@@ -1,4 +1,7 @@
 // ── Core constants ──
+// Bump on each iteration so the user can tell which build the menu is running.
+const GAME_VERSION = 'v2026-04-16.7';
+
 const SCALE = 3;
 const TILE = 16;
 const TILE_DRAW = TILE * SCALE;

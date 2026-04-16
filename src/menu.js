@@ -43,18 +43,29 @@ function drawMenu() {
   textAlign(CENTER, CENTER);
 
   textSize(28);
-  text('NEW SUPER MARIO BROS 2D ALL STARS', width / 2, 100);
+  text('NEW SUPER MARIO BROS 2D ALL STARS', width / 2, 50);
 
-  textSize(14);
-  text('A p5.js game', width / 2, 140);
+  if (isTouchDevice) {
+    textSize(20);
+    fill(255, 220, 50);
+    text('Touch the screen to start playing', width / 2, 110);
+  }
 
   textSize(22);
-  drawMenuOption('I have a controller', 280, menuSelection === 0);
-  drawMenuOption('Keyboard controls', 330, menuSelection === 1);
+  drawMenuOption('I have a controller', 180, menuSelection === 0);
+  drawMenuOption('Keyboard controls',   220, menuSelection === 1);
 
   fill(180);
   textSize(14);
-  text('Use UP/DOWN arrows and ENTER to select', width / 2, 430);
+  text('Use UP/DOWN arrows and ENTER to select', width / 2, 280);
+
+  // Build version — small, top-left, visible on every viewport.
+  push();
+  textAlign(LEFT, TOP);
+  textSize(11);
+  fill(150);
+  text(GAME_VERSION, 8, 8);
+  pop();
 }
 
 // ── Player select ──

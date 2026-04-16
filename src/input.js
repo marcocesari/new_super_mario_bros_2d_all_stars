@@ -318,6 +318,8 @@ function loadLevel(mapStrings, keepPowerUps) {
 // ── Keyboard input ──
 
 function keyPressed() {
+  handleFirstGesture();
+
   // Menu navigation
   if (game.state === 'menu') {
     if (keyCode === UP_ARROW || keyCode === DOWN_ARROW) {

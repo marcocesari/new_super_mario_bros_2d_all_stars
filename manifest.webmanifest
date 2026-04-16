@@ -1,0 +1,14 @@
+{
+  "name": "New Super Mario Bros 2D All Stars",
+  "short_name": "Mario Bros",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "start_url": "./",
+  "scope": "./",
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

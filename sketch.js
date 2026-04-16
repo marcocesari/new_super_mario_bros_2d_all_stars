@@ -48,42 +48,86 @@ let playerSelectChoice = 0;   // 0 = 1 player, 1 = 2 players
 let deathTimer = 0;
 let levelCompleteTimer = 0;
 
+// Uniform scale applied to the world draw so the full level height fits the
+// screen (otherwise the ground row is cut off on short viewports like iPhone
+// landscape). Updated every frame in draw() before camera + world render.
+let viewScale = 1;
+
 // ── p5.js lifecycle ──
 
 function preload() {
-  marioSheet = loadImage('assets/mario_and_items.png');
+  marioSheet = loadImage('assets/mario.png');
   blocksSheet = loadImage('assets/blocks.png');
   enemiesSheet = loadImage('assets/enemies.png');
-  yoshiSheet = loadImage('assets/images of Yoshi.png');
-  rideSheet = loadImage('assets/mario_on_yoshi.png');
-  eatSheet = loadImage('assets/yoshi_eating.png');
-  sounds.music = loadSound('assets/01. Ground Theme.mp3');
-  sounds.music2 = loadSound('assets/02 Player Select.mp3');
-  sounds.music3 = loadSound('assets/09. Overworld.mp3');
-  sounds.death = loadSound('assets/08. Lost A Life Theme.mp3');
-  sounds.gameOver = loadSound('assets/09. Game Over Theme.mp3');
-  sounds.levelComplete = loadSound('assets/06. Level Complete Theme.mp3');
-  sounds.coin = loadSound('assets/smw_coin.wav');
+  yoshiSheet = loadImage('assets/yoshi.png');
+  rideSheet = loadImage('assets/mario_yoshi.png');
+  eatSheet = loadImage('assets/yoshi_eat.png');
+  // Pass error callback so a single failed decode (common on iOS Safari)
+  // doesn't leave preload hanging — the game starts muted for that track.
+  loadSoundSafe('music',         'assets/audio/music_ground.mp3');
+  loadSoundSafe('music2',        'assets/audio/music_player_select.mp3');
+  loadSoundSafe('music3',        'assets/audio/music_overworld.mp3');
+  loadSoundSafe('death',         'assets/audio/music_death.mp3');
+  loadSoundSafe('gameOver',      'assets/audio/music_gameover.mp3');
+  loadSoundSafe('levelComplete', 'assets/audio/music_level_complete.mp3');
+  loadSoundSafe('coin',          'assets/audio/sfx_coin.wav');
+}
+
+function loadSoundSafe(key, path) {
+  sounds[key] = loadSound(path, null, () => { sounds[key] = null; });
 }
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
   noSmooth();
   game.currentLevel = 0;
-  userStartAudio();
+  // Force the AudioContext into existence (suspended) so p5.sound can
+  // register its AudioWorklet. We do NOT resume it here — that requires a
+  // user gesture on iOS and is handled by handleFirstGesture() on first tap.
+  try { getAudioContext(); } catch (e) { /* ignore */ }
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
 }
 
+// ── p5 input entry points (handlers are picked up by p5 from global scope).
+// First-gesture unlock + menu-advance live in src/mobile.js.
+
+function touchStarted() {
+  handleFirstGesture();
+  handleMenuTouchAdvance();
+  return false; // preventDefault → suppress Safari double-tap-zoom / scroll
+}
+function mousePressed() {
+  handleFirstGesture();
+  // On a touchscreen device, the synthesized mouse click would advance the
+  // menu a second time — touchStarted already handled it.
+  if (!isTouchDevice) handleMenuTouchAdvance();
+}
+
 function draw() {
+  // On a phone held upright the game would squash horizontally — iOS PWAs
+  // can't be orientation-locked, so block gameplay with a rotate prompt and
+  // resume automatically once the user turns the device.
+  if (isTouchDevice && height > width) {
+    drawRotatePrompt();
+    return;
+  }
+
+  updateTouchControls();
+
   if (game.state === 'menu') { drawMenu(); return; }
   if (game.state === 'playerSelect') { drawPlayerSelect(); return; }
   if (game.state === 'controllerConnect') { drawControllerConnect(); return; }
 
   let bg = LEVEL_THEMES[game.currentLevel].bg;
   background(bg[0], bg[1], bg[2]);
+
+  // Fit the trimmed stage (10 rows) into the viewport height exactly, so the
+  // level always fills the screen vertically on any viewport. noSmooth() keeps
+  // pixel art crisp even at fractional scales.
+  viewScale = levelRows > 0 ? height / (levelRows * TILE_DRAW) : 1;
 
   switch (game.state) {
     case 'playing':
@@ -140,6 +184,13 @@ function draw() {
       break;
   }
 
+  // Anchor ground to the bottom of the screen: translate so the scaled stage
+  // ends flush with `height`, leaving any extra space as sky above.
+  let stageScreenH = levelRows * TILE_DRAW * viewScale;
+  let worldYOffset = height - stageScreenH;
+  push();
+  translate(0, worldYOffset);
+  scale(viewScale);
   drawLevel();
   drawEnemies();
   drawPopups();
@@ -147,7 +198,9 @@ function draw() {
   drawYoshiEggs();
   drawYoshis();
   drawAllPlayers();
+  pop();
   drawHUD();
+  drawTouchControls();
 
   if (game.state === 'levelComplete') {
     levelCompleteTimer--;

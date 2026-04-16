@@ -202,6 +202,8 @@ const YOSHI_EAT_RANGE = 120;
 function isEatButtonHeld() {
   // Keyboard: shift key
   if (keyIsDown(SHIFT) || keyIsDown(16)) return true;
+  // Touch: on-screen B button
+  if (touchActionHeld) return true;
   // Controller: mapped eat button
   if (useController && gpMapped && gpMapping.eat >= 0) {
     let gp = getGamepad();
@@ -210,11 +212,13 @@ function isEatButtonHeld() {
   return false;
 }
 
-// Full eat animation cycle: 6 frames × 3 ticks = 18 ticks.
-// The tongue is fully extended around frame 3 (~tick 9 of the cycle).
-const YOSHI_EAT_CYCLE = 18;
-const YOSHI_EAT_CONTACT_START = 9;  // tongue first reaches enemies
-const YOSHI_EAT_CONTACT_END = 15;   // tongue starts retracting
+// Full eat animation cycle: smooth extend and retract with no pause.
+// Tongue extends, is available for eating contact, then retracts back in.
+const YOSHI_EAT_CYCLE = 42;
+const YOSHI_EAT_CONTACT_START = 10;  // tongue first reaches enemies
+const YOSHI_EAT_CONTACT_END = 32;   // tongue starts retracting
+const YOSHI_TONGUE_BALL_RADIUS = 12; // radius of the ball at end of tongue
+const YOSHI_TONGUE_MAX_REACH = 180; // maximum distance tongue extends (covers gaps between islands)
 
 function yoshiTryEat(player) {
   let y = player.ridingYoshi;
@@ -228,9 +232,8 @@ function yoshiTryEat(player) {
 
   if (y.eating <= 0) return;
 
-  // While the tongue is out, scan every frame for enemies in range. We
-  // don't lock a target at button-press time because the enemy may walk
-  // into range *during* the cycle. Eat at most one enemy per cycle.
+  // While the tongue is out, scan for enemies colliding with the tongue ball.
+  // Eat at most one enemy per cycle.
   let elapsed = YOSHI_EAT_CYCLE - y.eating;
   if (y.ateThisCycle) return;
   if (elapsed < YOSHI_EAT_CONTACT_START || elapsed > YOSHI_EAT_CONTACT_END) return;
@@ -238,20 +241,33 @@ function yoshiTryEat(player) {
   let px = player.worldX + player.ox + player.hw / 2;
   let py = player.worldY + player.oy + player.hh / 2;
 
+  // Calculate tongue extension progress (0 to 1 at peak, then back to 0)
+  let cycleProgress = (elapsed - YOSHI_EAT_CONTACT_START) / (YOSHI_EAT_CONTACT_END - YOSHI_EAT_CONTACT_START);
+  // Make it extend and retract: goes 0->1 then 1->0
+  let tongueExtension = cycleProgress < 0.5 ? cycleProgress * 2 : (1 - cycleProgress) * 2;
+  
+  // Calculate tongue ball position at the end of the tongue
+  let tongueReach = YOSHI_TONGUE_MAX_REACH * tongueExtension;
+  let tongueBallX = px + (player.facing * tongueReach);
+  let tongueBallY = py;
+
+  // Check for collision with tongue ball (circle collision)
   let bestEnemy = null;
   let bestDist = Infinity;
   for (let enemy of enemies) {
     if (!enemy.alive || enemy.state === 'stomped') continue;
     let ex = enemy.worldX + enemy.ox + enemy.hw / 2;
     let ey = enemy.worldY + enemy.oy + enemy.hh / 2;
-    let dx = ex - px;
-    let dy = abs(ey - py);
-    if (dy >= TILE_DRAW || abs(dx) >= YOSHI_EAT_RANGE) continue;
-    if (player.facing === 1 && dx <= -20) continue;
-    if (player.facing === -1 && dx >= 20) continue;
-    if (abs(dx) < bestDist) {
-      bestDist = abs(dx);
-      bestEnemy = enemy;
+    let dx = ex - tongueBallX;
+    let dy = ey - tongueBallY;
+    let dist = sqrt(dx * dx + dy * dy);
+    
+    // Check if enemy center is within tongue ball radius
+    if (dist <= YOSHI_TONGUE_BALL_RADIUS + 15) { // +15 for enemy size tolerance
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestEnemy = enemy;
+      }
     }
   }
 
@@ -259,6 +275,8 @@ function yoshiTryEat(player) {
     bestEnemy.alive = false;
     game.score += 200;
     y.ateThisCycle = true;
+    // Retract tongue immediately after eating (end animation completely)
+    y.eating = 0; // Immediately stop eating animation
   }
 }
 
