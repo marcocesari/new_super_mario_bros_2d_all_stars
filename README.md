@@ -10,7 +10,7 @@ Three worlds, two players, mushrooms, pipes, Yoshi — and a tongue that eats Go
 
 ## Play online
 
-Click to play in your browser: https://editor.p5js.org/marcocesari/full/vI0fEBG94
+Click to play in your browser: https://marcocesari.github.io/new_super_mario_bros_2d_all_stars
 
 > Hosted on the [p5.js Web Editor](https://editor.p5js.org/). The first load takes a few seconds while the music files download. Click anywhere on the canvas first — browsers block audio until you interact with the page.
 
@@ -23,11 +23,6 @@ Click to play in your browser: https://editor.p5js.org/marcocesari/full/vI0fEBG9
 - **Enemies** — Goombas: stomp them or eat them with Yoshi
 - **Controller support** — auto-detects Bluetooth gamepads with a guided button-mapping screen
 - **Original soundtracks** — ground theme, level clear, lost-a-life, game over
-
-
-Then visit [http://localhost:8000](http://localhost:8000).
-
-> The page loads p5.js from a CDN, so an internet connection is required on first run.
 
 ## Controls
 
