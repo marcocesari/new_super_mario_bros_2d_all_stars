@@ -59,7 +59,7 @@ const BLOCK_SPRITES = {
   groundFill: blk(4, 0),
   solidBlock: blk(1, 0),
   question:   blk(6, 1),
-  hitBlock:   blk(1, 0),
+  hitBlock:   blk(0, 1),
   pipeTopL:   blk(16, 6),
   pipeTopR:   blk(17, 6),
   pipeBodyL:  blk(16, 7),
