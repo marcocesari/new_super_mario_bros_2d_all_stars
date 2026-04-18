@@ -71,6 +71,8 @@ function resolveCollision(ent, axis) {
               hitCoinBlock(r, c);
             } else if (levelData[r][c] === 'yoshiBlock') {
               hitYoshiBlock(r, c);
+            } else if (levelData[r][c] === 'brick' && ent.big) {
+              levelData[r][c] = null;
             }
           }
         }
