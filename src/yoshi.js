@@ -101,17 +101,8 @@ function updateYoshiEggs() {
         e.hatching = true;
         e.vx = 0;
 
-        // Play hatch sound and freeze gameplay until it finishes.
+        // Play hatch sound over the level music (no stop/restart).
         if (sounds.yoshiHatch) {
-          // Stop only the level music so the hatch jingle is audible.
-          if (activeLevelMusic && activeLevelMusic.isPlaying()) {
-            activeLevelMusic.stop();
-          }
-          if (levelMusicLoopTimer) {
-            clearTimeout(levelMusicLoopTimer);
-            levelMusicLoopTimer = null;
-          }
-          // Ensure audio context is running (iOS can re-suspend it).
           tryResumeAudio();
           sounds.yoshiHatch.setVolume(1.0);
           sounds.yoshiHatch.play();
@@ -119,10 +110,6 @@ function updateYoshiEggs() {
           let dur = sounds.yoshiHatch.duration();
           e.hatchDuration = max(90, round(dur * 60));
           e.hatchTimer = e.hatchDuration;
-          sounds.yoshiHatch.onended(() => {
-            // Resume level music after hatch sound.
-            playLevelMusic();
-          });
         } else {
           e.hatchDuration = 60;
           e.hatchTimer = 60;
