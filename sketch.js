@@ -12,6 +12,7 @@ let sounds = {
   gameOver: null,
   levelComplete: null,
   coin: null,
+  yoshiHatch: null,
 };
 
 // Game state
@@ -21,6 +22,7 @@ let game = {
   score: 0,
   coinCount: 0,
   currentLevel: 0,
+  yoshiHatching: false,
 };
 
 // Level state
@@ -71,6 +73,7 @@ function preload() {
   loadSoundSafe('gameOver',      'assets/audio/music_gameover.mp3');
   loadSoundSafe('levelComplete', 'assets/audio/music_level_complete.mp3');
   loadSoundSafe('coin',          'assets/audio/sfx_coin.wav');
+  loadSoundSafe('yoshiHatch',    'assets/audio/yoshi_hatch.mp3');
 }
 
 function loadSoundSafe(key, path) {
@@ -131,6 +134,11 @@ function draw() {
 
   switch (game.state) {
     case 'playing':
+      // Yoshi hatch cutscene: only update the egg animation, freeze everything else.
+      if (game.yoshiHatching) {
+        updateYoshiEggs();
+        break;
+      }
       for (let p of players) {
         if (p.growing) {
           p.growTimer--;

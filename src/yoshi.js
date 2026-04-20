@@ -13,10 +13,12 @@ const YOSHI_FRAMES = {
   idle: [{ x: 39, y: 123, w: 26, h: 36 }],
   eat: [{ x: 75, y: 271, w: 49, h: 21 }],
   hatch: [
-    { x: 0, y: 105, w: 14, h: 18 },
-    { x: 17, y: 105, w: 13, h: 16 },
-    { x: 6, y: 127, w: 18, h: 19 },
-    { x: 6, y: 149, w: 21, h: 19 },
+    { x: 0, y: 105, w: 14, h: 18 },   // egg
+    { x: 17, y: 105, w: 13, h: 16 },   // egg cracking
+    { x: 6, y: 127, w: 18, h: 19 },    // shell breaking
+    { x: 6, y: 149, w: 21, h: 19 },    // baby Yoshi emerging
+    { x: 39, y: 123, w: 26, h: 36 },   // green Yoshi standing (idle)
+    { x: 67, y: 125, w: 27, h: 34 },   // green Yoshi walk frame
   ],
 };
 
@@ -83,21 +85,41 @@ function updateYoshiEggs() {
       }
     } else if (e.hatching) {
       e.hatchTimer--;
-      // Advance hatch frame over time
-      let progress = 1 - e.hatchTimer / 60;
-      e.hatchFrame = floor(progress * 4);
-      e.hatchFrame = constrain(e.hatchFrame, 0, 3);
+      // Advance through 6 frames: 4 egg-crack frames then 2 green Yoshi frames.
+      let totalFrames = YOSHI_FRAMES.hatch.length;
+      let progress = 1 - e.hatchTimer / e.hatchDuration;
+      e.hatchFrame = floor(progress * totalFrames);
+      e.hatchFrame = constrain(e.hatchFrame, 0, totalFrames - 1);
       if (e.hatchTimer <= 0) {
         yoshis.push(createYoshi(e.worldX - 10, e.worldY - 20));
         e.alive = false;
+        game.yoshiHatching = false;
       }
     } else {
       if (e.onGround) {
         e.vy = 1;
         e.hatching = true;
-        e.hatchTimer = 60;
-        e.hatchFrame = 0;
         e.vx = 0;
+
+        // Play hatch sound and freeze gameplay until it finishes.
+        if (sounds.yoshiHatch) {
+          // Pause level music while the hatch jingle plays.
+          stopAllSounds();
+          sounds.yoshiHatch.play();
+          // Set hatch duration to match the sound length (in frames at 60fps).
+          let dur = sounds.yoshiHatch.duration();
+          e.hatchDuration = max(60, round(dur * 60));
+          e.hatchTimer = e.hatchDuration;
+          sounds.yoshiHatch.onended(() => {
+            // Resume level music after hatch sound.
+            playLevelMusic();
+          });
+        } else {
+          e.hatchDuration = 60;
+          e.hatchTimer = 60;
+        }
+        e.hatchFrame = 0;
+        game.yoshiHatching = true;
       } else {
         e.vy += GRAVITY;
       }
