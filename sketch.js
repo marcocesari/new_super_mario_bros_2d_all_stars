@@ -230,62 +230,101 @@ function draw() {
   }
 }
 
-// ── DEBUG: draw yoshi.png sprite sheet with grid overlay ──
-// Press 'G' to toggle. Shows row/col numbers so user can identify frames.
+// ── DEBUG: draggable sprite picker overlay ──
+// Press 'G' to show, 'H' to hide.
+// Drag the coloured squares over the sprites you want.
+// The coordinates panel shows the pixel position on the original image.
+
 let _showSpriteDebug = false;
+let _debugScale = 2;
+let _debugOX = 10, _debugOY = 10;
+
+// 7 draggable boxes: B0-B4 = birth frames, M0-M1 = mouth frames
+let _debugBoxes = [
+  { label: 'B0', x: 70,  y: 220, w: 40, h: 44, col: [255, 100, 100] },
+  { label: 'B1', x: 120, y: 220, w: 40, h: 44, col: [255, 160, 60] },
+  { label: 'B2', x: 170, y: 220, w: 40, h: 44, col: [255, 255, 60] },
+  { label: 'B3', x: 220, y: 220, w: 40, h: 44, col: [100, 255, 100] },
+  { label: 'B4', x: 270, y: 220, w: 40, h: 44, col: [100, 200, 255] },
+  { label: 'M0', x: 70,  y: 520, w: 64, h: 64, col: [200, 100, 255] },
+  { label: 'M1', x: 150, y: 520, w: 64, h: 64, col: [255, 100, 200] },
+];
+let _debugDragIdx = -1;
+let _debugDragOff = { x: 0, y: 0 };
+
 function drawSpriteDebug() {
-  if (keyIsDown(71)) _showSpriteDebug = true;   // 'G' to show
-  if (keyIsDown(72)) _showSpriteDebug = false;  // 'H' to hide
+  if (keyIsDown(71)) _showSpriteDebug = true;   // G
+  if (keyIsDown(72)) _showSpriteDebug = false;  // H
   if (!_showSpriteDebug) return;
 
-  let scale2 = 2;
-  let sheetW = 503 * scale2;
-  let sheetH = 620 * scale2;
-  let ox = 10, oy = 10;
+  let s = _debugScale;
+  let ox = _debugOX, oy = _debugOY;
 
-  // Dark backdrop
-  fill(0, 0, 0, 220);
+  // Backdrop
+  fill(0, 0, 0, 230);
   noStroke();
   rect(0, 0, width, height);
 
-  // Draw the full sprite sheet scaled up
-  image(yoshiSheet, ox, oy, sheetW, sheetH);
+  // Sprite sheet
+  image(yoshiSheet, ox, oy, 503 * s, 620 * s);
 
-  // Grid overlay — rows & cols sized to match the green section.
-  // Green section starts at roughly y=85 in the original image.
-  let gridStartY = 85 * scale2 + oy;
-  let cellH = 25 * scale2;   // approximate row height
-  let cellW = 25 * scale2;   // approximate col width
-  let numRows = 10;
-  let numCols = 10;
+  // Handle dragging (mouse or first touch)
+  let mx = mouseX, my = mouseY;
+  let pressing = mouseIsPressed;
+  if (touches.length > 0) { mx = touches[0].x; my = touches[0].y; pressing = true; }
 
-  textSize(11);
-  textAlign(CENTER, CENTER);
-
-  for (let r = 0; r < numRows; r++) {
-    for (let c = 0; c < numCols; c++) {
-      let x2 = ox + c * cellW;
-      let y2 = gridStartY + r * cellH;
-
-      // Alternating cell colour for visibility
-      let even = (r + c) % 2 === 0;
-      stroke(255, 255, 0, 180);
-      strokeWeight(1);
-      fill(even ? color(255, 255, 0, 40) : color(0, 200, 255, 40));
-      rect(x2, y2, cellW, cellH);
-
-      // Label: "r,c"
-      noStroke();
-      fill(255, 255, 255, 220);
-      text(r + ',' + c, x2 + cellW / 2, y2 + cellH / 2);
+  if (pressing && _debugDragIdx === -1) {
+    // Try to pick up a box
+    for (let i = _debugBoxes.length - 1; i >= 0; i--) {
+      let b = _debugBoxes[i];
+      if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+        _debugDragIdx = i;
+        _debugDragOff.x = mx - b.x;
+        _debugDragOff.y = my - b.y;
+        break;
+      }
     }
   }
+  if (pressing && _debugDragIdx >= 0) {
+    let b = _debugBoxes[_debugDragIdx];
+    b.x = mx - _debugDragOff.x;
+    b.y = my - _debugDragOff.y;
+  }
+  if (!pressing) _debugDragIdx = -1;
 
-  // Instructions
+  // Draw boxes + coordinate panel
+  textAlign(CENTER, CENTER);
+  for (let b of _debugBoxes) {
+    stroke(b.col[0], b.col[1], b.col[2]);
+    strokeWeight(2);
+    fill(b.col[0], b.col[1], b.col[2], 50);
+    rect(b.x, b.y, b.w, b.h);
+    noStroke();
+    fill(255);
+    textSize(13);
+    text(b.label, b.x + b.w / 2, b.y + b.h / 2);
+  }
+
+  // Coordinate readout (right side)
+  let panelX = min(width - 260, 503 * s + ox + 20);
+  let panelY = oy;
+  fill(0, 0, 0, 200);
   noStroke();
+  rect(panelX, panelY, 250, _debugBoxes.length * 28 + 60);
   fill(255);
-  textSize(16);
+  textSize(14);
   textAlign(LEFT, TOP);
-  text('Yoshi sprite sheet (2x) — press H to hide', ox, oy + sheetH + 10);
-  text('Yellow grid: row/col starting at y=85. Tell me the row,col of the frames you want.', ox, oy + sheetH + 30);
+  text('Drag squares onto sprites:', panelX + 8, panelY + 8);
+  text('Press H to hide', panelX + 8, panelY + 26);
+  for (let i = 0; i < _debugBoxes.length; i++) {
+    let b = _debugBoxes[i];
+    // Convert screen position back to original image pixels
+    let imgX = round((b.x - ox) / s);
+    let imgY = round((b.y - oy) / s);
+    let imgW = round(b.w / s);
+    let imgH = round(b.h / s);
+    fill(b.col[0], b.col[1], b.col[2]);
+    textSize(12);
+    text(b.label + ': x=' + imgX + ' y=' + imgY + ' w=' + imgW + ' h=' + imgH, panelX + 8, panelY + 50 + i * 28);
+  }
 }
