@@ -102,19 +102,25 @@ function updateYoshiEggs() {
       let progress = 1 - e.hatchTimer / HATCH_BIRTH_DURATION;
       e.hatchFrame = constrain(floor(progress * frames.length), 0, frames.length - 1);
       if (e.hatchTimer <= 0) {
-        // Transition to phase 2 — mouth frames, sound on mouth-open.
+        // Transition to phase 2 — M0 briefly, then M1 + sound.
         e.hatchPhase = 'mouth';
         e.hatchFrame = 0;
-        e.hatchDuration = 40; // ~0.67s: M0 first half, M1 second half
-        e.hatchTimer = 40;
+        // 10 frames of M0 (mouth starting), then M1 stays until sound ends.
+        e.mouthOpenAt = 10;
+        let soundDur = 60;
+        if (yoshiHatchSound) {
+          let dur = yoshiHatchSound.duration();
+          if (dur > 0) soundDur = round(dur * 60);
+        }
+        e.hatchDuration = e.mouthOpenAt + max(30, soundDur);
+        e.hatchTimer = e.hatchDuration;
       }
     } else if (e.hatchPhase === 'mouth') {
-      // Phase 2: M0 → M1 (mouth opens). Sound triggers on M1.
+      // Phase 2: M0 briefly → M1 (mouth open) stays until sound finishes.
       e.hatchTimer--;
-      let frames = YOSHI_FRAMES.hatchMouth;
-      let progress = 1 - e.hatchTimer / e.hatchDuration;
-      let newFrame = constrain(floor(progress * frames.length), 0, frames.length - 1);
-      // Play sound the moment the mouth-open frame (M1) appears.
+      let elapsed = e.hatchDuration - e.hatchTimer;
+      let newFrame = elapsed < e.mouthOpenAt ? 0 : 1;
+      // Play sound the moment M1 (mouth open) appears.
       if (newFrame === 1 && e.hatchFrame === 0 && yoshiHatchSound) {
         tryResumeAudio();
         yoshiHatchSound.setVolume(1.0);
@@ -122,18 +128,13 @@ function updateYoshiEggs() {
       }
       e.hatchFrame = newFrame;
       if (e.hatchTimer <= 0) {
-        // Transition to phase 3 — little hops. Unfreeze gameplay now.
-        e.hatchPhase = 'jumping';
-        e.hatchTimer = 50;
-        e.hatchFrame = 0;
-        game.yoshiHatching = false; // player can move again
-      }
-    } else if (e.hatchPhase === 'jumping') {
-      // Phase 3: Yoshi does little hops (gameplay already unfrozen).
-      e.hatchTimer--;
-      if (e.hatchTimer <= 0) {
-        yoshis.push(createYoshi(e.worldX - 10, e.worldY - 20));
+        // Spawn bouncing Yoshi and unfreeze gameplay.
+        let y = createYoshi(e.worldX - 10, e.worldY - 20);
+        y.bouncing = true;
+        y.bounceTimer = 0;
+        yoshis.push(y);
         e.alive = false;
+        game.yoshiHatching = false;
       }
     } else {
       // Not hatching yet — fall until landing.
@@ -180,16 +181,6 @@ function drawYoshiEggs() {
       let drawW = f.w * refScale;
       let drawH = f.h * refScale;
       image(yoshiSheet, sx, feetY - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
-    } else if (e.hatchPhase === 'jumping') {
-      // Little hops: 4 bounces over the duration, cycle walk frames.
-      let elapsed = 50 - e.hatchTimer;
-      let bouncePhase = (elapsed / 50) * 3; // 3 hops
-      let bounceY = -abs(sin(bouncePhase * PI)) * 25; // 25px hop height
-      let walkIdx = floor(elapsed / 6) % YOSHI_FRAMES.walk.length;
-      let f = YOSHI_FRAMES.walk[walkIdx];
-      let drawW = f.w * refScale;
-      let drawH = f.h * refScale;
-      image(yoshiSheet, sx, feetY - drawH + bounceY, drawW, drawH, f.x, f.y, f.w, f.h);
     } else {
       // Egg sprite before hatching starts.
       let f = YOSHI_FRAMES.egg[0];
@@ -256,6 +247,7 @@ function checkYoshiMountFor(player) {
     if (!y.alive || y.mounted) continue;
     if (boxOverlap(player, y)) {
       y.mounted = true;
+      y.bouncing = false;
       player.ridingYoshi = y;
       break;
     }
@@ -370,17 +362,22 @@ function drawYoshis() {
   for (let y of yoshis) {
     if (!y.alive || y.mounted) continue;
     let sx = y.worldX - cameraX;
-
-    // Idle animation
-    y.animTimer++;
-    if (y.animTimer >= 12) {
-      y.animTimer = 0;
-      y.animFrame = (y.animFrame + 1) % YOSHI_FRAMES.walk.length;
-    }
-
-    let frames = YOSHI_FRAMES.idle;
     let feetY = y.worldY + y.oy + y.hh;
-    drawYoshiSprite(sx, feetY - YOSHI_DRAW_H, y.facing, frames, 0);
+
+    if (y.bouncing) {
+      // Little hops in place using idle frame (no walking).
+      y.bounceTimer++;
+      let bounceY = -abs(sin(y.bounceTimer * 0.12)) * 20;
+      drawYoshiSprite(sx, feetY - YOSHI_DRAW_H + bounceY, y.facing, YOSHI_FRAMES.idle, 0);
+    } else {
+      // Normal idle
+      y.animTimer++;
+      if (y.animTimer >= 12) {
+        y.animTimer = 0;
+        y.animFrame = (y.animFrame + 1) % YOSHI_FRAMES.walk.length;
+      }
+      drawYoshiSprite(sx, feetY - YOSHI_DRAW_H, y.facing, YOSHI_FRAMES.idle, 0);
+    }
   }
 }
 
