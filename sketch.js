@@ -12,8 +12,10 @@ let sounds = {
   gameOver: null,
   levelComplete: null,
   coin: null,
-  yoshiHatch: null,
 };
+
+// Kept outside `sounds` so stopAllSounds() never touches it.
+let yoshiHatchSound = null;
 
 // Game state
 let game = {
@@ -73,7 +75,7 @@ function preload() {
   loadSoundSafe('gameOver',      'assets/audio/music_gameover.mp3');
   loadSoundSafe('levelComplete', 'assets/audio/music_level_complete.mp3');
   loadSoundSafe('coin',          'assets/audio/sfx_coin.wav');
-  loadSoundSafe('yoshiHatch',    'assets/audio/yoshi_hatch.mp3');
+  yoshiHatchSound = loadSound('assets/audio/yoshi_hatch.mp3', null, () => { yoshiHatchSound = null; });
 }
 
 function loadSoundSafe(key, path) {

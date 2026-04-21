@@ -102,12 +102,12 @@ function updateYoshiEggs() {
         e.vx = 0;
 
         // Play hatch sound over the level music (no stop/restart).
-        if (sounds.yoshiHatch) {
+        if (yoshiHatchSound) {
           tryResumeAudio();
-          sounds.yoshiHatch.setVolume(1.0);
-          sounds.yoshiHatch.play();
+          yoshiHatchSound.setVolume(1.0);
+          yoshiHatchSound.play();
           // Set hatch duration to match the sound length (in frames at 60fps).
-          let dur = sounds.yoshiHatch.duration();
+          let dur = yoshiHatchSound.duration();
           e.hatchDuration = max(90, round(dur * 60));
           e.hatchTimer = e.hatchDuration;
         } else {
