@@ -230,16 +230,16 @@ function draw() {
   }
 }
 
-// ── DEBUG: draggable sprite picker overlay ──
+// ── DEBUG: resizable + draggable sprite picker overlay ──
 // Press 'G' to show, 'H' to hide.
-// Drag the coloured squares over the sprites you want.
-// The coordinates panel shows the pixel position on the original image.
+// Each square can be MOVED by dragging its body and RESIZED by dragging
+// the yellow handle in the bottom-right corner.
 
 let _showSpriteDebug = false;
 let _debugScale = 2;
 let _debugOX = 10, _debugOY = 10;
+let _debugHandleSize = 18; // resize handle in bottom-right corner
 
-// 7 draggable boxes: B0-B4 = birth frames, M0-M1 = mouth frames
 let _debugBoxes = [
   { label: 'B0', x: 70,  y: 220, w: 40, h: 44, col: [255, 100, 100] },
   { label: 'B1', x: 120, y: 220, w: 40, h: 44, col: [255, 160, 60] },
@@ -249,8 +249,9 @@ let _debugBoxes = [
   { label: 'M0', x: 70,  y: 520, w: 64, h: 64, col: [200, 100, 255] },
   { label: 'M1', x: 150, y: 520, w: 64, h: 64, col: [255, 100, 200] },
 ];
-let _debugDragIdx = -1;
-let _debugDragOff = { x: 0, y: 0 };
+let _debugAction = 'none'; // 'none', 'move', 'resize'
+let _debugIdx = -1;
+let _debugOff = { x: 0, y: 0 };
 
 function drawSpriteDebug() {
   if (keyIsDown(71)) _showSpriteDebug = true;   // G
@@ -259,6 +260,7 @@ function drawSpriteDebug() {
 
   let s = _debugScale;
   let ox = _debugOX, oy = _debugOY;
+  let hs = _debugHandleSize;
 
   // Backdrop
   fill(0, 0, 0, 230);
@@ -268,63 +270,89 @@ function drawSpriteDebug() {
   // Sprite sheet
   image(yoshiSheet, ox, oy, 503 * s, 620 * s);
 
-  // Handle dragging (mouse or first touch)
+  // Pointer (mouse or first touch)
   let mx = mouseX, my = mouseY;
   let pressing = mouseIsPressed;
   if (touches.length > 0) { mx = touches[0].x; my = touches[0].y; pressing = true; }
 
-  if (pressing && _debugDragIdx === -1) {
-    // Try to pick up a box
+  // Start drag / resize
+  if (pressing && _debugAction === 'none') {
     for (let i = _debugBoxes.length - 1; i >= 0; i--) {
       let b = _debugBoxes[i];
+      // Check resize handle first (bottom-right corner)
+      let hx = b.x + b.w - hs, hy = b.y + b.h - hs;
+      if (mx >= hx && mx <= hx + hs && my >= hy && my <= hy + hs) {
+        _debugAction = 'resize';
+        _debugIdx = i;
+        _debugOff.x = mx - (b.x + b.w);
+        _debugOff.y = my - (b.y + b.h);
+        break;
+      }
+      // Check body for move
       if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
-        _debugDragIdx = i;
-        _debugDragOff.x = mx - b.x;
-        _debugDragOff.y = my - b.y;
+        _debugAction = 'move';
+        _debugIdx = i;
+        _debugOff.x = mx - b.x;
+        _debugOff.y = my - b.y;
         break;
       }
     }
   }
-  if (pressing && _debugDragIdx >= 0) {
-    let b = _debugBoxes[_debugDragIdx];
-    b.x = mx - _debugDragOff.x;
-    b.y = my - _debugDragOff.y;
-  }
-  if (!pressing) _debugDragIdx = -1;
 
-  // Draw boxes + coordinate panel
+  // Apply drag / resize
+  if (pressing && _debugIdx >= 0) {
+    let b = _debugBoxes[_debugIdx];
+    if (_debugAction === 'move') {
+      b.x = mx - _debugOff.x;
+      b.y = my - _debugOff.y;
+    } else if (_debugAction === 'resize') {
+      b.w = max(20, mx - b.x - _debugOff.x);
+      b.h = max(20, my - b.y - _debugOff.y);
+    }
+  }
+
+  // Release
+  if (!pressing) { _debugAction = 'none'; _debugIdx = -1; }
+
+  // Draw boxes
   textAlign(CENTER, CENTER);
   for (let b of _debugBoxes) {
+    // Box outline + tinted fill
     stroke(b.col[0], b.col[1], b.col[2]);
     strokeWeight(2);
     fill(b.col[0], b.col[1], b.col[2], 50);
     rect(b.x, b.y, b.w, b.h);
+
+    // Resize handle (yellow square, bottom-right)
     noStroke();
+    fill(255, 255, 0);
+    rect(b.x + b.w - hs, b.y + b.h - hs, hs, hs);
+
+    // Label
     fill(255);
     textSize(13);
     text(b.label, b.x + b.w / 2, b.y + b.h / 2);
   }
 
-  // Coordinate readout (right side)
-  let panelX = min(width - 260, 503 * s + ox + 20);
+  // Coordinate readout panel
+  let panelX = min(width - 280, 503 * s + ox + 20);
   let panelY = oy;
   fill(0, 0, 0, 200);
   noStroke();
-  rect(panelX, panelY, 250, _debugBoxes.length * 28 + 60);
+  rect(panelX, panelY, 270, _debugBoxes.length * 28 + 70);
   fill(255);
   textSize(14);
   textAlign(LEFT, TOP);
-  text('Drag squares onto sprites:', panelX + 8, panelY + 8);
-  text('Press H to hide', panelX + 8, panelY + 26);
+  text('Drag body to move, yellow', panelX + 8, panelY + 8);
+  text('corner to resize. Press H to hide.', panelX + 8, panelY + 26);
   for (let i = 0; i < _debugBoxes.length; i++) {
     let b = _debugBoxes[i];
-    // Convert screen position back to original image pixels
     let imgX = round((b.x - ox) / s);
     let imgY = round((b.y - oy) / s);
     let imgW = round(b.w / s);
     let imgH = round(b.h / s);
     fill(b.col[0], b.col[1], b.col[2]);
     textSize(12);
-    text(b.label + ': x=' + imgX + ' y=' + imgY + ' w=' + imgW + ' h=' + imgH, panelX + 8, panelY + 50 + i * 28);
+    text(b.label + ': x=' + imgX + ' y=' + imgY + ' w=' + imgW + ' h=' + imgH, panelX + 8, panelY + 52 + i * 28);
   }
 }
