@@ -124,6 +124,15 @@ function updateYoshiEggs() {
       let progress = 1 - e.hatchTimer / e.hatchDuration;
       e.hatchFrame = constrain(floor(progress * frames.length), 0, frames.length - 1);
       if (e.hatchTimer <= 0) {
+        // Transition to phase 3 — Yoshi standing idle briefly.
+        e.hatchPhase = 'idle';
+        e.hatchTimer = 60; // ~1 second
+        e.hatchFrame = 0;
+      }
+    } else if (e.hatchPhase === 'idle') {
+      // Phase 3: Yoshi stands (idle frame, no Mario) before gameplay resumes.
+      e.hatchTimer--;
+      if (e.hatchTimer <= 0) {
         yoshis.push(createYoshi(e.worldX - 10, e.worldY - 20));
         e.alive = false;
         game.yoshiHatching = false;
@@ -165,6 +174,12 @@ function drawYoshiEggs() {
     } else if (e.hatchPhase === 'mouth') {
       let frames = YOSHI_FRAMES.hatchMouth;
       let f = frames[e.hatchFrame];
+      let drawW = f.w * eggScale;
+      let drawH = f.h * eggScale;
+      image(yoshiSheet, sx, e.worldY + 50 - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
+    } else if (e.hatchPhase === 'idle') {
+      // Draw Yoshi standing (idle frame, no Mario).
+      let f = YOSHI_FRAMES.idle[0];
       let drawW = f.w * eggScale;
       let drawH = f.h * eggScale;
       image(yoshiSheet, sx, e.worldY + 50 - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
