@@ -211,6 +211,7 @@ function draw() {
   pop();
   drawHUD();
   drawTouchControls();
+  drawSpriteDebug();
 
   if (game.state === 'levelComplete') {
     levelCompleteTimer--;
@@ -227,4 +228,68 @@ function draw() {
     pollOverlayControls();
     drawOverlay('GAME OVER', 'Press R to restart');
   }
+}
+
+// ── DEBUG: draw yoshi.png sprite sheet with grid overlay ──
+// Press 'G' to toggle. Shows row/col numbers so user can identify frames.
+let _showSpriteDebug = false;
+function drawSpriteDebug() {
+  if (keyIsDown(71)) _showSpriteDebug = true;   // 'G' to show
+  if (keyIsDown(72)) _showSpriteDebug = false;  // 'H' to hide
+  if (!_showSpriteDebug) return;
+
+  let scale2 = 2;
+  let sheetW = 503 * scale2;
+  let sheetH = 620 * scale2;
+  let ox = 10, oy = 10;
+
+  // Dark backdrop
+  fill(0, 0, 0, 220);
+  noStroke();
+  rect(0, 0, width, height);
+
+  // Draw the full sprite sheet scaled up
+  image(yoshiSheet, ox, oy, sheetW, sheetH);
+
+  // Grid overlay — rows & cols sized to match the green section.
+  // Green section starts at roughly y=85 in the original image.
+  let gridStartY = 85 * scale2 + oy;
+  let cellH = 25 * scale2;   // approximate row height
+  let cellW = 25 * scale2;   // approximate col width
+  let numRows = 10;
+  let numCols = 10;
+
+  stroke(255, 255, 0, 160);
+  strokeWeight(1);
+  textSize(12);
+  textAlign(LEFT, TOP);
+  fill(255, 255, 0);
+  noStroke();
+
+  for (let r = 0; r <= numRows; r++) {
+    let y2 = gridStartY + r * cellH;
+    stroke(255, 255, 0, 160);
+    strokeWeight(1);
+    line(ox, y2, ox + numCols * cellW, y2);
+    noStroke();
+    fill(255, 255, 0);
+    text('r' + r, ox - 2, y2 + 2);
+  }
+  for (let c = 0; c <= numCols; c++) {
+    let x2 = ox + c * cellW;
+    stroke(255, 255, 0, 160);
+    strokeWeight(1);
+    line(x2, gridStartY, x2, gridStartY + numRows * cellH);
+    noStroke();
+    fill(255, 255, 0);
+    text('c' + c, x2 + 2, gridStartY - 14);
+  }
+
+  // Instructions
+  noStroke();
+  fill(255);
+  textSize(16);
+  textAlign(LEFT, TOP);
+  text('Yoshi sprite sheet (2x) — press H to hide', ox, oy + sheetH + 10);
+  text('Yellow grid: row/col starting at y=85. Tell me the row,col of the frames you want.', ox, oy + sheetH + 30);
 }
