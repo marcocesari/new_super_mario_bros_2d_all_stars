@@ -13,19 +13,17 @@ const YOSHI_FRAMES = {
   idle: [{ x: 39, y: 123, w: 26, h: 36 }],
   eat: [{ x: 75, y: 271, w: 49, h: 21 }],
   // Phase 1 — birth (silent): row 0 cols 2-6 in yoshi.png
-  // Row 0 starts at y=105 (same row as the egg). Estimates — may need tuning.
   hatchBirth: [
-    { x: 33, y: 105, w: 15, h: 18 },   // col 2
-    { x: 50, y: 105, w: 16, h: 18 },   // col 3
-    { x: 68, y: 105, w: 18, h: 20 },   // col 4
-    { x: 88, y: 105, w: 18, h: 20 },   // col 5
-    { x: 108, y: 105, w: 20, h: 22 },  // col 6
+    { x: 43,  y: 104, w: 17, h: 15 },  // B0
+    { x: 60,  y: 102, w: 16, h: 16 },  // B1
+    { x: 76,  y: 102, w: 17, h: 16 },  // B2
+    { x: 93,  y: 102, w: 18, h: 16 },  // B3
+    { x: 113, y: 95,  w: 26, h: 24 },  // B4
   ],
   // Phase 2 — face player + open mouth (with sound): row 6 cols 3-4
-  // Row 6 estimated at y=255. Estimates — may need tuning.
   hatchMouth: [
-    { x: 78, y: 255, w: 30, h: 32 },   // col 3
-    { x: 110, y: 255, w: 30, h: 32 },  // col 4
+    { x: 169, y: 278, w: 16, h: 30 },  // M0
+    { x: 187, y: 274, w: 17, h: 33 },  // M1
   ],
   // Egg sprite (row 0 col 0) — known-good position.
   egg: [{ x: 0, y: 105, w: 14, h: 18 }],
