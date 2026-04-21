@@ -259,30 +259,26 @@ function drawSpriteDebug() {
   let numRows = 10;
   let numCols = 10;
 
-  stroke(255, 255, 0, 160);
-  strokeWeight(1);
-  textSize(12);
-  textAlign(LEFT, TOP);
-  fill(255, 255, 0);
-  noStroke();
+  textSize(11);
+  textAlign(CENTER, CENTER);
 
-  for (let r = 0; r <= numRows; r++) {
-    let y2 = gridStartY + r * cellH;
-    stroke(255, 255, 0, 160);
-    strokeWeight(1);
-    line(ox, y2, ox + numCols * cellW, y2);
-    noStroke();
-    fill(255, 255, 0);
-    text('r' + r, ox - 2, y2 + 2);
-  }
-  for (let c = 0; c <= numCols; c++) {
-    let x2 = ox + c * cellW;
-    stroke(255, 255, 0, 160);
-    strokeWeight(1);
-    line(x2, gridStartY, x2, gridStartY + numRows * cellH);
-    noStroke();
-    fill(255, 255, 0);
-    text('c' + c, x2 + 2, gridStartY - 14);
+  for (let r = 0; r < numRows; r++) {
+    for (let c = 0; c < numCols; c++) {
+      let x2 = ox + c * cellW;
+      let y2 = gridStartY + r * cellH;
+
+      // Alternating cell colour for visibility
+      let even = (r + c) % 2 === 0;
+      stroke(255, 255, 0, 180);
+      strokeWeight(1);
+      fill(even ? color(255, 255, 0, 40) : color(0, 200, 255, 40));
+      rect(x2, y2, cellW, cellH);
+
+      // Label: "r,c"
+      noStroke();
+      fill(255, 255, 255, 220);
+      text(r + ',' + c, x2 + cellW / 2, y2 + cellH / 2);
+    }
   }
 
   // Instructions
