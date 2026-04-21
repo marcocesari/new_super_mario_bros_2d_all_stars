@@ -12,14 +12,21 @@ const YOSHI_FRAMES = {
   ],
   idle: [{ x: 39, y: 123, w: 26, h: 36 }],
   eat: [{ x: 75, y: 271, w: 49, h: 21 }],
-  hatch: [
-    { x: 0, y: 105, w: 14, h: 18 },   // egg
-    { x: 17, y: 105, w: 13, h: 16 },   // egg cracking
-    { x: 6, y: 127, w: 18, h: 19 },    // shell breaking
-    { x: 6, y: 149, w: 21, h: 19 },    // baby Yoshi emerging
-    { x: 39, y: 123, w: 26, h: 36 },   // green Yoshi standing (idle)
-    { x: 67, y: 125, w: 27, h: 34 },   // green Yoshi walk frame
+  // Phase 1 — birth (silent): row 0 cols 2-6 in yoshi.png
+  hatchBirth: [
+    { x: 30, y: 85, w: 14, h: 18 },    // col 2: egg cracking
+    { x: 46, y: 85, w: 16, h: 18 },    // col 3: shell splitting
+    { x: 64, y: 85, w: 18, h: 20 },    // col 4: pieces apart
+    { x: 84, y: 85, w: 18, h: 20 },    // col 5: baby emerging
+    { x: 104, y: 85, w: 20, h: 22 },   // col 6: baby out
   ],
+  // Phase 2 — face player + open mouth (with sound): row 6 cols 3-4
+  hatchMouth: [
+    { x: 78, y: 240, w: 30, h: 32 },   // col 3: Yoshi facing, mouth opening
+    { x: 110, y: 240, w: 30, h: 32 },  // col 4: Yoshi mouth open
+  ],
+  // Egg sprite (row 0 col 0) used before hatching starts
+  egg: [{ x: 0, y: 85, w: 14, h: 16 }],
 };
 
 const YOSHI_DRAW_W = 80;
@@ -58,8 +65,10 @@ function hitYoshiBlock(row, col) {
     onGround: false,
     alive: true,
     rising: true,
-    hatching: false,
+    // Two-phase hatch: 'none' → 'birth' (silent) → 'mouth' (with sound)
+    hatchPhase: 'none',
     hatchTimer: 0,
+    hatchDuration: 0,
     hatchFrame: 0,
     ox: 6,
     oy: 6,
@@ -69,6 +78,9 @@ function hitYoshiBlock(row, col) {
 }
 
 // ── Egg update ──
+
+// Birth phase duration (frames at 60fps) — plays the 5 hatchBirth frames.
+const HATCH_BIRTH_DURATION = 90;
 
 function updateYoshiEggs() {
   for (let i = yoshiEggs.length - 1; i >= 0; i--) {
@@ -83,38 +95,47 @@ function updateYoshiEggs() {
         e.vy = 0;
         e.vx = 0;
       }
-    } else if (e.hatching) {
+    } else if (e.hatchPhase === 'birth') {
+      // Phase 1: silent birth animation (hatchBirth frames).
       e.hatchTimer--;
-      // Advance through 6 frames: 4 egg-crack frames then 2 green Yoshi frames.
-      let totalFrames = YOSHI_FRAMES.hatch.length;
+      let frames = YOSHI_FRAMES.hatchBirth;
+      let progress = 1 - e.hatchTimer / HATCH_BIRTH_DURATION;
+      e.hatchFrame = constrain(floor(progress * frames.length), 0, frames.length - 1);
+      if (e.hatchTimer <= 0) {
+        // Transition to phase 2 — mouth open with sound.
+        e.hatchPhase = 'mouth';
+        e.hatchFrame = 0;
+        if (yoshiHatchSound) {
+          tryResumeAudio();
+          yoshiHatchSound.setVolume(1.0);
+          yoshiHatchSound.play();
+          let dur = yoshiHatchSound.duration();
+          e.hatchDuration = max(60, round(dur * 60));
+          e.hatchTimer = e.hatchDuration;
+        } else {
+          e.hatchDuration = 60;
+          e.hatchTimer = 60;
+        }
+      }
+    } else if (e.hatchPhase === 'mouth') {
+      // Phase 2: Yoshi faces player + opens mouth while sound plays.
+      e.hatchTimer--;
+      let frames = YOSHI_FRAMES.hatchMouth;
       let progress = 1 - e.hatchTimer / e.hatchDuration;
-      e.hatchFrame = floor(progress * totalFrames);
-      e.hatchFrame = constrain(e.hatchFrame, 0, totalFrames - 1);
+      e.hatchFrame = constrain(floor(progress * frames.length), 0, frames.length - 1);
       if (e.hatchTimer <= 0) {
         yoshis.push(createYoshi(e.worldX - 10, e.worldY - 20));
         e.alive = false;
         game.yoshiHatching = false;
       }
     } else {
+      // Not hatching yet — fall until landing.
       if (e.onGround) {
         e.vy = 1;
-        e.hatching = true;
-        e.vx = 0;
-
-        // Play hatch sound over the level music (no stop/restart).
-        if (yoshiHatchSound) {
-          tryResumeAudio();
-          yoshiHatchSound.setVolume(1.0);
-          yoshiHatchSound.play();
-          // Set hatch duration to match the sound length (in frames at 60fps).
-          let dur = yoshiHatchSound.duration();
-          e.hatchDuration = max(90, round(dur * 60));
-          e.hatchTimer = e.hatchDuration;
-        } else {
-          e.hatchDuration = 60;
-          e.hatchTimer = 60;
-        }
+        e.hatchPhase = 'birth';
+        e.hatchTimer = HATCH_BIRTH_DURATION;
         e.hatchFrame = 0;
+        e.vx = 0;
         game.yoshiHatching = true;
       } else {
         e.vy += GRAVITY;
@@ -134,16 +155,22 @@ function drawYoshiEggs() {
     let sx = e.worldX - cameraX;
 
     let eggScale = 3;
-    if (e.hatching) {
-      // Draw hatching animation from sprite sheet
-      let f = YOSHI_FRAMES.hatch[e.hatchFrame];
+    if (e.hatchPhase === 'birth') {
+      let frames = YOSHI_FRAMES.hatchBirth;
+      let f = frames[e.hatchFrame];
       let drawW = f.w * eggScale;
       let drawH = f.h * eggScale;
       let shake = e.hatchTimer < 30 ? floor(random(-2, 3)) : 0;
       image(yoshiSheet, sx + shake, e.worldY + 50 - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
+    } else if (e.hatchPhase === 'mouth') {
+      let frames = YOSHI_FRAMES.hatchMouth;
+      let f = frames[e.hatchFrame];
+      let drawW = f.w * eggScale;
+      let drawH = f.h * eggScale;
+      image(yoshiSheet, sx, e.worldY + 50 - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
     } else {
-      // Draw first hatch frame as the egg
-      let f = YOSHI_FRAMES.hatch[0];
+      // Draw egg sprite before hatching.
+      let f = YOSHI_FRAMES.egg[0];
       let drawW = f.w * eggScale;
       let drawH = f.h * eggScale;
       image(yoshiSheet, sx, e.worldY + 50 - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
