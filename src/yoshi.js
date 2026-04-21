@@ -124,13 +124,13 @@ function updateYoshiEggs() {
       let progress = 1 - e.hatchTimer / e.hatchDuration;
       e.hatchFrame = constrain(floor(progress * frames.length), 0, frames.length - 1);
       if (e.hatchTimer <= 0) {
-        // Transition to phase 3 — Yoshi standing idle briefly.
-        e.hatchPhase = 'idle';
-        e.hatchTimer = 60; // ~1 second
+        // Transition to phase 3 — Yoshi does little jumps.
+        e.hatchPhase = 'jumping';
+        e.hatchTimer = 90; // ~1.5 seconds of hopping
         e.hatchFrame = 0;
       }
-    } else if (e.hatchPhase === 'idle') {
-      // Phase 3: Yoshi stands (idle frame, no Mario) before gameplay resumes.
+    } else if (e.hatchPhase === 'jumping') {
+      // Phase 3: Yoshi does little hops after the sound finishes.
       e.hatchTimer--;
       if (e.hatchTimer <= 0) {
         yoshis.push(createYoshi(e.worldX - 10, e.worldY - 20));
@@ -159,36 +159,45 @@ function updateYoshiEggs() {
 // ── Egg drawing ──
 
 function drawYoshiEggs() {
+  // Use the same scale as normal Yoshi so hatch sprites match in-game size.
+  let refScale = YOSHI_DRAW_H / YOSHI_FRAMES.idle[0].h;
+  let eggScale = 3; // only for the small egg sprite before hatching
+
   for (let e of yoshiEggs) {
     if (!e.alive) continue;
     let sx = e.worldX - cameraX;
+    // Anchor: feet sit at e.worldY + 50 (same baseline for all phases).
+    let feetY = e.worldY + 50;
 
-    let eggScale = 3;
     if (e.hatchPhase === 'birth') {
       let frames = YOSHI_FRAMES.hatchBirth;
       let f = frames[e.hatchFrame];
-      let drawW = f.w * eggScale;
-      let drawH = f.h * eggScale;
+      let drawW = f.w * refScale;
+      let drawH = f.h * refScale;
       let shake = e.hatchTimer < 30 ? floor(random(-2, 3)) : 0;
-      image(yoshiSheet, sx + shake, e.worldY + 50 - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
+      image(yoshiSheet, sx + shake, feetY - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
     } else if (e.hatchPhase === 'mouth') {
       let frames = YOSHI_FRAMES.hatchMouth;
       let f = frames[e.hatchFrame];
-      let drawW = f.w * eggScale;
-      let drawH = f.h * eggScale;
-      image(yoshiSheet, sx, e.worldY + 50 - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
-    } else if (e.hatchPhase === 'idle') {
-      // Draw Yoshi standing (idle frame, no Mario).
-      let f = YOSHI_FRAMES.idle[0];
-      let drawW = f.w * eggScale;
-      let drawH = f.h * eggScale;
-      image(yoshiSheet, sx, e.worldY + 50 - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
+      let drawW = f.w * refScale;
+      let drawH = f.h * refScale;
+      image(yoshiSheet, sx, feetY - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
+    } else if (e.hatchPhase === 'jumping') {
+      // Little hops: 4 bounces over the duration, cycle walk frames.
+      let elapsed = 90 - e.hatchTimer;
+      let bouncePhase = (elapsed / 90) * 4; // 4 hops
+      let bounceY = -abs(sin(bouncePhase * PI)) * 25; // 25px hop height
+      let walkIdx = floor(elapsed / 6) % YOSHI_FRAMES.walk.length;
+      let f = YOSHI_FRAMES.walk[walkIdx];
+      let drawW = f.w * refScale;
+      let drawH = f.h * refScale;
+      image(yoshiSheet, sx, feetY - drawH + bounceY, drawW, drawH, f.x, f.y, f.w, f.h);
     } else {
-      // Draw egg sprite before hatching.
+      // Egg sprite before hatching starts.
       let f = YOSHI_FRAMES.egg[0];
       let drawW = f.w * eggScale;
       let drawH = f.h * eggScale;
-      image(yoshiSheet, sx, e.worldY + 50 - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
+      image(yoshiSheet, sx, feetY - drawH, drawW, drawH, f.x, f.y, f.w, f.h);
     }
   }
 }
