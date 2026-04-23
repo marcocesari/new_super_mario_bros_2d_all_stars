@@ -167,7 +167,10 @@ function pollOverlayControls() {
     overlayLastState = game.state;
   }
 
-  if (!useController || !gpMapped) return;
+  // No useController gate — consistent with pollGamepad above. If the user
+  // has a mapped gamepad, the overlay's RESTART/CONTINUE buttons respond to
+  // it regardless of which menu option they originally picked.
+  if (!gpMapped) return;
   let gp = getGamepad();
   if (!gp) return;
 

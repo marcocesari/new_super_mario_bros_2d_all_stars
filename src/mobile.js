@@ -368,7 +368,12 @@ function handleMenuTouchAdvance() {
   if (!isTouchDevice) return false;
 
   if (game.state === 'menu' || game.state === 'controllerConnect' || game.state === 'playerSelect') {
-    useController = false;
+    // On the MarcoGames iOS host with a gamepad connected, keep controller
+    // mode on — otherwise isEatButtonHeld (and other useController-gated
+    // checks) will ignore the gamepad after a tap-to-start.
+    if (!(window.__p5NativeHost && getGamepad())) {
+      useController = false;
+    }
     twoPlayer = false;
     startGame();
     return true;

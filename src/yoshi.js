@@ -263,8 +263,11 @@ function isEatButtonHeld() {
   if (keyIsDown(SHIFT) || keyIsDown(16)) return true;
   // Touch: on-screen B button
   if (touchActionHeld) return true;
-  // Controller: mapped eat button
-  if (useController && gpMapped && gpMapping.eat >= 0) {
+  // Controller: mapped eat button. No useController check — the other
+  // gamepad readers (pollGamepad for jump/dismount/callYoshi/start) don't
+  // gate on it either, so keep behaviour consistent and always honour a
+  // connected mapped gamepad.
+  if (gpMapped && gpMapping.eat >= 0) {
     let gp = getGamepad();
     if (gp && gp.buttons[gpMapping.eat] && gp.buttons[gpMapping.eat].pressed) return true;
   }
