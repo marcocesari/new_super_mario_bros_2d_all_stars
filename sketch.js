@@ -90,6 +90,20 @@ function setup() {
   // register its AudioWorklet. We do NOT resume it here — that requires a
   // user gesture on iOS and is handled by handleFirstGesture() on first tap.
   try { getAudioContext(); } catch (e) { /* ignore */ }
+  // iOS native host (WKWebView + GamepadBridge.swift): preset the standard
+  // W3C gamepad mapping so the player skips the manual mapping flow. No-op
+  // in a regular browser — __p5NativeHost is undefined there.
+  if (window.__p5NativeHost) {
+    useController = true;
+    gpMapped = true;
+    gpMapping.jump = 0;        // A / cross
+    gpMapping.eat = 1;         // B / circle
+    gpMapping.dismount = 2;    // X / square
+    gpMapping.callYoshi = 3;   // Y / triangle
+    gpMapping.start = 9;       // Menu / options
+    gpMapping.left = -1;       // use analog stick
+    gpMapping.right = -1;
+  }
 }
 
 function windowResized() {
@@ -211,6 +225,7 @@ function draw() {
   pop();
   drawHUD();
   drawTouchControls();
+  drawNativeGamepadBanner();
 
   if (game.state === 'levelComplete') {
     levelCompleteTimer--;

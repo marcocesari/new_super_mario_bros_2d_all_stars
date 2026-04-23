@@ -44,6 +44,9 @@
     <!-- rendering & UI -->
     <script src="src/hud.js?v=17"></script>
     <script src="src/menu.js?v=17"></script>
+    <!-- iOS native-app bridge: monkey-patches navigator.getGamepads when
+         running inside the MarcoGames WKWebView. No-op in a regular browser. -->
+    <script src="src/native-gamepad-bridge.js?v=17"></script>
     <script src="src/input.js?v=17"></script>
     <script src="src/mobile.js?v=17"></script>
 

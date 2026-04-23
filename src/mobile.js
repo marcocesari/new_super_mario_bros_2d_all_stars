@@ -199,7 +199,11 @@ function _updateVirtualJoystick(L) {
 }
 
 function updateTouchControls() {
-  if (!isTouchDevice || game.state !== 'playing') {
+  // Inside the MarcoGames iOS app, a connected native gamepad takes over and
+  // the on-screen touch UI should go away. Falls back to touch if the gamepad
+  // disconnects mid-game.
+  let nativeGpActive = window.__p5NativeHost && getGamepad();
+  if (!isTouchDevice || game.state !== 'playing' || nativeGpActive) {
     touchLeftHeld = false;
     touchRightHeld = false;
     touchActionHeld = false;
@@ -249,8 +253,45 @@ function updateTouchControls() {
   _updateVirtualJoystick(L);
 }
 
+// Native-host gamepad status banner: a 2.5s pill shown when a MarcoGames
+// iOS app detects a gamepad connect/disconnect, so the player knows why
+// the touch UI just appeared/vanished. No-op in a regular browser.
+let _nativeGpLastState = null;  // null = unseen, true = connected, false = not
+let _nativeGpBannerUntil = 0;
+
+function drawNativeGamepadBanner() {
+  if (!window.__p5NativeHost) return;
+  let connected = !!getGamepad();
+  if (_nativeGpLastState === null) {
+    _nativeGpLastState = connected;
+    return;
+  }
+  if (connected !== _nativeGpLastState) {
+    _nativeGpLastState = connected;
+    _nativeGpBannerUntil = millis() + 2500;
+  }
+  if (millis() >= _nativeGpBannerUntil) return;
+
+  let msg = connected ? 'Controller connected' : 'Controller disconnected — using touch';
+  push();
+  textAlign(CENTER, CENTER);
+  textSize(14);
+  let pad = 10;
+  let w = textWidth(msg) + pad * 2;
+  let h = 28;
+  let x = width / 2 - w / 2;
+  let y = 12;
+  noStroke();
+  fill(0, 0, 0, 200);
+  rect(x, y, w, h, 6);
+  fill(connected ? color(80, 220, 120) : color(240, 200, 80));
+  text(msg, width / 2, y + h / 2 + 1);
+  pop();
+}
+
 function drawTouchControls() {
   if (!isTouchDevice || game.state !== 'playing') return;
+  if (window.__p5NativeHost && getGamepad()) return;
 
   let L = getTouchButtonLayout();
   push();
