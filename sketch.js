@@ -135,6 +135,7 @@ function draw() {
   }
 
   updateTouchControls();
+  _watchLevelMusic();
 
   if (game.state === 'menu') { drawMenu(); return; }
   if (game.state === 'playerSelect') { drawPlayerSelect(); return; }

@@ -231,26 +231,31 @@ function playLevelMusic() {
   if (!levelMusic) return;
   if (activeLevelMusic === levelMusic && levelMusic.isPlaying()) return;
 
+  // Always stop whatever was playing before. Protects against the race where
+  // an older resume()-then-play() chain is still pending and would start a
+  // second overlapping copy of the same track when it fires.
+  if (activeLevelMusic && activeLevelMusic.isPlaying()) {
+    activeLevelMusic.stop();
+  }
+
   activeLevelMusic = levelMusic;
   levelMusic.setVolume(0.5);
 
-  // On iOS the AudioContext can still be 'suspended' the very first time
-  // we try to play music (userStartAudio resolves asynchronously). If so,
-  // resume the context first and retry play() once it's running — otherwise
-  // the .play() call is silently dropped and the user hears nothing.
+  // Only call play() when the AudioContext is verifiably 'running'. On iOS
+  // WKWebView, ctx.resume() called outside a user gesture can resolve while
+  // the context is still effectively muted — relying on its promise leads to
+  // silent SoundFile state that .isPlaying() then reports as "playing",
+  // which blocks all later retries.
+  // If the ctx isn't ready, kick it and let the per-frame watchdog
+  // (_watchLevelMusic, called from draw()) retry once the next gesture has
+  // unlocked it.
   let ctx = null;
   try { ctx = getAudioContext(); } catch (e) { /* ignore */ }
-  if (ctx && ctx.state !== 'running' && typeof ctx.resume === 'function') {
-    let r = ctx.resume();
-    if (r && typeof r.then === 'function') {
-      r.then(() => {
-        if (activeLevelMusic === levelMusic) levelMusic.play();
-      }).catch(() => { levelMusic.play(); });
-    } else {
-      levelMusic.play();
-    }
-  } else {
+  if (ctx && ctx.state === 'running') {
     levelMusic.play();
+  } else if (ctx && typeof ctx.resume === 'function') {
+    let r = ctx.resume();
+    if (r && typeof r.catch === 'function') r.catch(() => {});
   }
 
   // When the track finishes, wait a fixed 500 ms and restart it.
@@ -264,6 +269,23 @@ function playLevelMusic() {
       }
     }, LEVEL_MUSIC_LOOP_GAP_MS);
   });
+}
+
+// Per-frame check: if level music *should* be playing but isn't, and the
+// AudioContext is now running, start it. Catches the case where the first
+// playLevelMusic() ran before the user had tapped (so ctx was suspended).
+// Also recovers from spurious p5.sound state where a SoundFile is "marked
+// playing" but actually muted on iOS.
+function _watchLevelMusic() {
+  if (!activeLevelMusic) return;
+  if (game.state !== 'playing') return;
+  if (levelMusicLoopTimer) return;     // intentional 500ms gap
+  if (activeLevelMusic.isPlaying()) return;
+  let ctx;
+  try { ctx = getAudioContext(); } catch (e) { return; }
+  if (ctx && ctx.state === 'running') {
+    activeLevelMusic.play();
+  }
 }
 
 // ── Game start / level loading ──
