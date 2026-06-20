@@ -21,7 +21,15 @@
 
     <title>New Super Mario Bros 2D All Stars</title>
 
+    <link rel="preload" href="assets/fonts/NewSuperMarioFontU.ttf" as="font" type="font/ttf" crossorigin>
     <link rel="stylesheet" type="text/css" href="style.css">
+
+    <!-- Kick off font download so the canvas can use it ASAP. -->
+    <script>
+      if (document.fonts && document.fonts.load) {
+        document.fonts.load('48px "New Super Mario Font U"');
+      }
+    </script>
 
     <script src="libraries/p5.min.js"></script>
     <script src="libraries/p5.sound.min.js"></script>
@@ -43,7 +51,7 @@
 
     <!-- rendering & UI -->
     <script src="src/hud.js?v=22"></script>
-    <script src="src/menu.js?v=22"></script>
+    <script src="src/menu.js?v=24"></script>
     <!-- iOS native-app bridge: monkey-patches navigator.getGamepads when
          running inside the MarcoGames WKWebView. No-op in a regular browser. -->
     <script src="src/native-gamepad-bridge.js?v=22"></script>

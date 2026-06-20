@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'New Super Mario Font U';
+  src: url('assets/fonts/NewSuperMarioFontU.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
 html, body {
   margin: 0;
   padding: 0;

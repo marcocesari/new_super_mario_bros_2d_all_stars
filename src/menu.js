@@ -143,32 +143,249 @@ function _drawMenuLeftPanel() {
   _drawMenuButtons(pw / 2, ph * 0.73, pw);
 }
 
-function _drawMenuTitle(cx, startY, maxW) {
-  push();
-  textAlign(CENTER, TOP);
+// Actual New Super Mario Bros. logo face (assets/fonts), Arial Black fallback.
+const LOGO_FONT = '1px "New Super Mario Font U", "Arial Black", Arial, sans-serif';
+const LOGO_SP   = 0.02;  // letter spacing (× size) — tight so shadows merge
 
-  const lines = [
-    { label: 'NEW',              sz: min(maxW * 0.20, 66), rgb: [255, 65,  65]  },
-    { label: 'SUPER MARIO BROS', sz: min(maxW * 0.12, 40), rgb: [255, 225, 45]  },
-    { label: '2D ALL STARS',     sz: min(maxW * 0.17, 56), rgb: [50,  215, 255] },
-  ];
+// One NSMB logo letter: flat white face with a thin black keyline, sitting on a
+// solid black drop-shadow offset down-right (fattened so neighbours merge into
+// one silhouette, like the real wordmark).
+function _drawLogoLetter(ctx, ch, x, y, sz) {
+  ctx.font = LOGO_FONT.replace('1px', sz + 'px');
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.lineJoin = 'round';
+  ctx.miterLimit = 2;
 
-  let y = startY;
-  for (let { label, sz, rgb } of lines) {
-    textSize(sz);
-    textStyle(BOLD);
-    // Thick cartoon outline
-    fill(0);
-    let d = max(2, sz * 0.07);
-    for (let [ox, oy] of [[-d,0],[d,0],[0,-d],[0,d],[-d,-d],[d,-d],[-d,d],[d,d]]) {
-      text(label, cx + ox, y + oy);
-    }
-    fill(...rgb);
-    text(label, cx, y);
-    y += sz * 1.18;
+  // Solid black drop shadow (offset down-right, fattened to connect)
+  const dx = sz * 0.05, dy = sz * 0.14;
+  ctx.lineWidth   = sz * 0.18;
+  ctx.strokeStyle = '#000';
+  ctx.fillStyle   = '#000';
+  ctx.strokeText(ch, x + dx, y + dy);
+  ctx.fillText(ch, x + dx, y + dy);
+
+  // White face with a thin black keyline
+  ctx.lineWidth   = sz * 0.055;
+  ctx.strokeStyle = '#000';
+  ctx.strokeText(ch, x, y);
+  ctx.fillStyle   = '#fff';
+  ctx.fillText(ch, x, y);
+}
+
+function _logoRunWidth(ctx, str, sz) {
+  ctx.font = LOGO_FONT.replace('1px', sz + 'px');
+  let t = 0;
+  for (const ch of str) t += ctx.measureText(ch).width + sz * LOGO_SP;
+  return t - sz * LOGO_SP;
+}
+
+// Draw a word left-aligned at x.
+function _drawLogoRun(ctx, str, x, y, sz) {
+  ctx.font = LOGO_FONT.replace('1px', sz + 'px');
+  for (const ch of str) {
+    const w = ctx.measureText(ch).width;
+    if (ch !== ' ') _drawLogoLetter(ctx, ch, x, y, sz);
+    x += w + sz * LOGO_SP;
   }
-  textStyle(NORMAL);
-  pop();
+}
+
+// Draw a word centred on cx, auto-shrinking to fit maxW. Returns size used.
+function _drawLogoCentered(ctx, str, cx, y, sz, maxW) {
+  let w = _logoRunWidth(ctx, str, sz);
+  if (w > maxW) { sz *= maxW / w; w = _logoRunWidth(ctx, str, sz); }
+  _drawLogoRun(ctx, str, cx - w / 2, y, sz);
+  return sz;
+}
+
+// The signature red spiky starburst "New" badge with white italic script.
+function _drawNewBadge(ctx, cx, cy, r) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.06);
+  ctx.lineJoin = 'round';
+
+  const pts = 11;
+  const star = (ro, ri) => {
+    ctx.beginPath();
+    for (let i = 0; i < pts * 2; i++) {
+      const rad = (i % 2 === 0) ? ro : ri;
+      const a = Math.PI / pts * i - Math.PI / 2;
+      const px = Math.cos(a) * rad, py = Math.sin(a) * rad;
+      if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+    }
+    ctx.closePath();
+  };
+
+  // drop shadow
+  ctx.save(); ctx.translate(2, 4);
+  ctx.fillStyle = 'rgba(0,0,0,0.28)'; star(r, r * 0.8); ctx.fill();
+  ctx.restore();
+  // white outline star
+  ctx.fillStyle = '#ffffff'; star(r, r * 0.8); ctx.fill();
+  // red star
+  ctx.fillStyle = '#e8231a'; star(r * 0.88, r * 0.70); ctx.fill();
+
+  // "New" — white italic script
+  ctx.font = `italic 900 ${r * 0.6}px Georgia, "Times New Roman", serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('New', 0, -r * 0.04);
+
+  ctx.restore();
+}
+
+// ── "2D ALL STARS" emblem — styled after the Super Mario 3D All-Stars logo ──
+
+function _roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y,     x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x,     y + h, r);
+  ctx.arcTo(x,     y + h, x,     y,     r);
+  ctx.arcTo(x,     y,     x + w, y,     r);
+  ctx.closePath();
+}
+
+// One big metallic letter: red 3D extrude, gold + red outlines, white-steel face.
+function _drawMetalLetter(ctx, ch, x, y, sz) {
+  ctx.font = LOGO_FONT.replace('1px', sz + 'px');
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.lineJoin = 'round';
+  ctx.miterLimit = 2;
+
+  // Red 3D extrude (down + slightly right)
+  const depth = sz * 0.11, steps = 8;
+  ctx.fillStyle = '#7d0f0f';
+  for (let i = steps; i >= 1; i--) {
+    const t = (i / steps) * depth;
+    ctx.fillText(ch, x + t * 0.55, y + t);
+  }
+  // Gold outer rim, then red rim
+  ctx.lineWidth = sz * 0.21; ctx.strokeStyle = '#e6a81c'; ctx.strokeText(ch, x, y);
+  ctx.lineWidth = sz * 0.12; ctx.strokeStyle = '#c0151a'; ctx.strokeText(ch, x, y);
+  // White-steel face
+  const g = ctx.createLinearGradient(0, y, 0, y + sz);
+  g.addColorStop(0, '#ffffff'); g.addColorStop(0.5, '#e6edf6'); g.addColorStop(1, '#b6c6dd');
+  ctx.fillStyle = g; ctx.fillText(ch, x, y);
+  // Glossy top sheen
+  const s = ctx.createLinearGradient(0, y, 0, y + sz * 0.5);
+  s.addColorStop(0, 'rgba(255,255,255,0.85)'); s.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = s; ctx.fillText(ch, x, y);
+}
+
+// Gold swallowtail ribbon with red "ALL ★ STARS".
+function _drawGoldBanner(ctx, cx, cy, w, h) {
+  const L = cx - w / 2, R = cx + w / 2, T = cy - h / 2, B = cy + h / 2;
+  const notch = h * 0.55;
+  ctx.save();
+  ctx.lineJoin = 'round';
+
+  // Folded tails behind (darker gold)
+  ctx.fillStyle = '#9a6606';
+  for (const s of [-1, 1]) {
+    const ex = (s < 0 ? L : R);
+    ctx.beginPath();
+    ctx.moveTo(ex, T + h * 0.15);
+    ctx.lineTo(ex + s * h * 0.7, T + h * 0.32);
+    ctx.lineTo(ex + s * h * 0.7, B - h * 0.10);
+    ctx.lineTo(ex, B - h * 0.30);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Ribbon body with swallowtail ends
+  ctx.beginPath();
+  ctx.moveTo(L, T);
+  ctx.lineTo(R, T);
+  ctx.lineTo(R - notch, cy);
+  ctx.lineTo(R, B);
+  ctx.lineTo(L, B);
+  ctx.lineTo(L + notch, cy);
+  ctx.closePath();
+  const bg = ctx.createLinearGradient(0, T, 0, B);
+  bg.addColorStop(0, '#fff3b0'); bg.addColorStop(0.5, '#f3c63c'); bg.addColorStop(1, '#c9870e');
+  ctx.fillStyle = bg; ctx.fill();
+  ctx.lineWidth = Math.max(1.5, h * 0.09); ctx.strokeStyle = '#6e3f00'; ctx.stroke();
+  ctx.lineWidth = Math.max(1, h * 0.04);  ctx.strokeStyle = '#fff2c0'; ctx.stroke();
+
+  // "ALL ★ STARS" in red
+  let fs = h * 0.52;
+  const setF = () => { ctx.font = `900 ${fs}px "Arial Black", Arial, sans-serif`; };
+  setF();
+  while (ctx.measureText('ALL ★ STARS').width > w * 0.74 && fs > 6) { fs -= 1; setF(); }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = Math.max(1, fs * 0.12);
+  ctx.strokeStyle = '#5e0c0c';
+  ctx.strokeText('ALL ★ STARS', cx, cy + h * 0.02);
+  ctx.fillStyle = '#c4161a';
+  ctx.fillText('ALL ★ STARS', cx, cy + h * 0.02);
+
+  ctx.restore();
+}
+
+function _drawAllStarsEmblem(ctx, cx, topY, w) {
+  const dSz = w * 0.30;                       // "2D" cap size
+  ctx.font = LOGO_FONT.replace('1px', dSz + 'px');
+  const sp = dSz * 0.02;
+  const w2 = ctx.measureText('2').width, wD = ctx.measureText('D').width;
+  const dTotal = w2 + sp + wD;
+  const dY = topY;
+
+  // Dark-red plaque behind "2D" with gold double-border
+  const plW = dTotal * 1.34, plH = dSz * 1.04;
+  const plX = cx - plW / 2, plY = dY - dSz * 0.05;
+  _roundRectPath(ctx, plX, plY, plW, plH, plH * 0.22);
+  const pg = ctx.createLinearGradient(0, plY, 0, plY + plH);
+  pg.addColorStop(0, '#d61f1f'); pg.addColorStop(1, '#7c0f0f');
+  ctx.fillStyle = pg; ctx.fill();
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(2, dSz * 0.08); ctx.strokeStyle = '#ecb73e'; ctx.stroke();
+  ctx.lineWidth = Math.max(1, dSz * 0.03); ctx.strokeStyle = '#6e4300'; ctx.stroke();
+
+  // "2D"
+  let x = cx - dTotal / 2;
+  _drawMetalLetter(ctx, '2', x, dY, dSz);
+  _drawMetalLetter(ctx, 'D', x + w2 + sp, dY, dSz);
+
+  // Gold "ALL ★ STARS" banner overlapping the plaque's bottom
+  const bH = dSz * 0.52;
+  const bY = plY + plH + bH * 0.02;
+  _drawGoldBanner(ctx, cx, bY, w * 1.0, bH);
+
+  return plH + bH; // approximate emblem height
+}
+
+function _drawMenuTitle(cx, startY, maxW) {
+  const ctx = drawingContext;
+  ctx.save();
+  let y = startY;
+
+  // ── Line 1: [New badge] SUPER ──
+  let sz1   = min(maxW * 0.20, 60);
+  let supW  = _logoRunWidth(ctx, 'SUPER', sz1);
+  let badgeR = sz1 * 0.72;
+  let gap    = sz1 * 0.14;
+  let groupW = badgeR * 2 + gap + supW;
+  if (groupW > maxW) {
+    const k = maxW / groupW;
+    sz1 *= k; supW *= k; badgeR *= k; gap *= k; groupW = maxW;
+  }
+  const gx = cx - groupW / 2;
+  _drawNewBadge(ctx, gx + badgeR, y + sz1 * 0.40, badgeR);
+  _drawLogoRun(ctx, 'SUPER', gx + badgeR * 2 + gap, y, sz1);
+  y += sz1 * 0.92;
+
+  // ── Line 2: MARIO BROS ──
+  y += _drawLogoCentered(ctx, 'MARIO BROS', cx, y, min(maxW * 0.185, 58), maxW) * 0.98;
+
+  // ── Line 3: "2D ALL STARS" emblem (Super Mario 3D All-Stars style) ──
+  _drawAllStarsEmblem(ctx, cx, y + maxW * 0.02, min(maxW * 0.92, 280));
+
+  ctx.restore();
 }
 
 function _drawMenuButtons(cx, centerY, rw) {
@@ -183,8 +400,8 @@ function _drawMenuButtons(cx, centerY, rw) {
   _menuBtnRects.controller = { x: b0x, y: by, w: btnW, h: btnH };
   _menuBtnRects.keyboard   = { x: b1x, y: by, w: btnW, h: btnH };
 
-  _drawMenuPillBtn('I HAVE CONTROLLER', b0x, by, btnW, btnH, menuSelection === 0);
-  _drawMenuPillBtn('KEYBOARD CONTROLS',  b1x, by, btnW, btnH, menuSelection === 1);
+  _drawMenuPillBtn('GRAB A CONTROLLER', b0x, by, btnW, btnH, menuSelection === 0);
+  _drawMenuPillBtn('GO KEYBOARD!',       b1x, by, btnW, btnH, menuSelection === 1);
 
   // Navigation hint below buttons
   push();
@@ -192,7 +409,7 @@ function _drawMenuButtons(cx, centerY, rw) {
   textSize(max(10, min(13, height * 0.017)));
   fill(190, 215, 255);
   noStroke();
-  text('← → to switch   ENTER to confirm', cx, centerY + btnH / 2 + 10);
+  text('← → PICK YOUR STYLE   •   ENTER = LET\'S-A GO!', cx, centerY + btnH / 2 + 10);
   pop();
 }
 
