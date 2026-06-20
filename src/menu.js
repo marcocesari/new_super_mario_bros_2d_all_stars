@@ -22,7 +22,7 @@ const GP_MAP_NAMES = ['left', 'right', 'jump', 'eat', 'dismount', 'callYoshi', '
 // Joystick dead zone
 const STICK_DEADZONE = 0.3;
 
-// ── Shared menu option renderer ──
+// ── Shared menu option renderer (kept for other screens) ──
 
 function drawMenuOption(label, y, isSelected) {
   if (isSelected) {
@@ -34,37 +34,195 @@ function drawMenuOption(label, y, isSelected) {
   }
 }
 
-// ── Main menu ──
+// ── Main menu ────────────────────────────────────────────────────────────────
+// Layout (landscape):
+//   LEFT  half  — looping video
+//   CENTER      — animated wavy gradient divider
+//   RIGHT half  — Mario-on-Yoshi sprite + stylised title + pill buttons
+
+// Animation state for the Mario-on-Yoshi sprite shown on the title screen.
+let _menuSprFrame  = 0;
+let _menuSprTimer  = 0;
+
+// Button bounding boxes, populated each frame and read by mobile touch handler.
+let _menuBtnRects = { controller: null, keyboard: null };
 
 function drawMenu() {
+  // ── Right half: black background (video will draw on top) ─────────────────
   background(0);
-  fill(255);
+
+  // ── Left half: sky-blue background (menu content) ─────────────────────────
   noStroke();
-  textAlign(CENTER, CENTER);
+  fill(92, 148, 252);
+  rect(0, 0, width / 2, height);
 
-  textSize(28);
-  text('NEW SUPER MARIO BROS 2D ALL STARS', width / 2, 50);
-
-  if (isTouchDevice) {
-    textSize(20);
-    fill(255, 220, 50);
-    text('Touch the screen to start playing', width / 2, 110);
+  // ── Right half: video, clipped so it never bleeds into the left panel ──────
+  if (menuVideo && menuVideo.elt.readyState >= 2) {
+    try {
+      let vw = menuVideo.elt.videoWidth  || 0;
+      let vh = menuVideo.elt.videoHeight || 0;
+      if (vw > 0 && vh > 0) {
+        let s  = Math.max((width / 2) / vw, height / vh);
+        let dw = vw * s, dh = vh * s;
+        let dx = width / 2 + ((width / 2) - dw) / 2;
+        let dy = (height - dh) / 2;
+        drawingContext.save();
+        drawingContext.beginPath();
+        drawingContext.rect(width / 2, 0, width / 2, height);
+        drawingContext.clip();
+        drawingContext.drawImage(menuVideo.elt, dx, dy, dw, dh);
+        drawingContext.restore();
+      }
+    } catch (_) {}
   }
 
-  textSize(22);
-  drawMenuOption('I have a controller', 180, menuSelection === 0);
-  drawMenuOption('Keyboard controls',   220, menuSelection === 1);
+  // ── Centre: wavy gradient divider ─────────────────────────────────────────
+  _drawMenuDivider();
 
-  fill(180);
-  textSize(14);
-  text('Use UP/DOWN arrows and ENTER to select', width / 2, 280);
+  // ── Left half: sprite + title + buttons ───────────────────────────────────
+  _drawMenuLeftPanel();
 
-  // Build version — small, top-left, visible on every viewport.
+  // Version tag (top-left corner)
   push();
   textAlign(LEFT, TOP);
   textSize(11);
-  fill(150);
+  fill(200);
+  noStroke();
   text(GAME_VERSION, 8, 8);
+  pop();
+}
+
+function _drawMenuDivider() {
+  let cx = width / 2;
+
+  // Gradient: opaque sky (left) → transparent sky (right), fading into the video
+  drawingContext.save();
+  let grad = drawingContext.createLinearGradient(cx - 20, 0, cx + 80, 0);
+  grad.addColorStop(0, 'rgba(92,148,252,1)');
+  grad.addColorStop(1, 'rgba(92,148,252,0)');
+  drawingContext.fillStyle = grad;
+  drawingContext.fillRect(cx - 20, 0, 100, height);
+  drawingContext.restore();
+
+  // Animated sine-wave line
+  push();
+  noFill();
+  stroke(255, 255, 255, 120);
+  strokeWeight(2.5);
+  beginShape();
+  for (let y = 0; y <= height; y += 4) {
+    let amp = 12 * (0.7 + 0.3 * sin(y * 0.012));
+    let x   = (cx - 32) + sin(y * 0.038 + frameCount * 0.045) * amp;
+    vertex(x, y);
+  }
+  endShape();
+  pop();
+}
+
+function _drawMenuLeftPanel() {
+  let pw = width  / 2;  // left panel width
+  let ph = height;
+
+  // Animate Mario-on-Yoshi (3-frame walk cycle, 10 ticks/frame)
+  _menuSprTimer++;
+  if (_menuSprTimer >= 10) { _menuSprTimer = 0; _menuSprFrame = (_menuSprFrame + 1) % RIDE_FRAMES.length; }
+
+  // ── Mario-on-Yoshi sprite (upper-right of left panel) ──
+  let sprSize = min(pw * 0.46, ph * 0.44);
+  let sprX    = pw * 0.54;
+  let sprY    = ph * 0.04;
+  try {
+    let rf = RIDE_FRAMES[_menuSprFrame];
+    image(rideSheet, sprX, sprY, sprSize, sprSize, rf.x, rf.y, rf.w, rf.h);
+  } catch (_) {}
+
+  // ── Title (upper-left of left panel) ──
+  _drawMenuTitle(pw * 0.28, ph * 0.07, pw * 0.48);
+
+  // ── Pill buttons (lower half, centered in left panel) ──
+  _drawMenuButtons(pw / 2, ph * 0.73, pw);
+}
+
+function _drawMenuTitle(cx, startY, maxW) {
+  push();
+  textAlign(CENTER, TOP);
+
+  const lines = [
+    { label: 'NEW',              sz: min(maxW * 0.20, 66), rgb: [255, 65,  65]  },
+    { label: 'SUPER MARIO BROS', sz: min(maxW * 0.12, 40), rgb: [255, 225, 45]  },
+    { label: '2D ALL STARS',     sz: min(maxW * 0.17, 56), rgb: [50,  215, 255] },
+  ];
+
+  let y = startY;
+  for (let { label, sz, rgb } of lines) {
+    textSize(sz);
+    textStyle(BOLD);
+    // Thick cartoon outline
+    fill(0);
+    let d = max(2, sz * 0.07);
+    for (let [ox, oy] of [[-d,0],[d,0],[0,-d],[0,d],[-d,-d],[d,-d],[-d,d],[d,d]]) {
+      text(label, cx + ox, y + oy);
+    }
+    fill(...rgb);
+    text(label, cx, y);
+    y += sz * 1.18;
+  }
+  textStyle(NORMAL);
+  pop();
+}
+
+function _drawMenuButtons(cx, centerY, rw) {
+  let btnW = min(rw * 0.41, 205);
+  let btnH = min(height * 0.075, 50);
+  let gap  = 16;
+
+  let b0x = cx - gap / 2 - btnW;
+  let b1x = cx + gap / 2;
+  let by  = centerY - btnH / 2;
+
+  _menuBtnRects.controller = { x: b0x, y: by, w: btnW, h: btnH };
+  _menuBtnRects.keyboard   = { x: b1x, y: by, w: btnW, h: btnH };
+
+  _drawMenuPillBtn('I HAVE CONTROLLER', b0x, by, btnW, btnH, menuSelection === 0);
+  _drawMenuPillBtn('KEYBOARD CONTROLS',  b1x, by, btnW, btnH, menuSelection === 1);
+
+  // Navigation hint below buttons
+  push();
+  textAlign(CENTER, TOP);
+  textSize(max(10, min(13, height * 0.017)));
+  fill(190, 215, 255);
+  noStroke();
+  text('← → to switch   ENTER to confirm', cx, centerY + btnH / 2 + 10);
+  pop();
+}
+
+function _drawMenuPillBtn(label, x, y, w, h, selected) {
+  push();
+  rectMode(CORNER);
+  noStroke();
+  let r = h / 2;
+
+  // Drop shadow
+  fill(0, 0, 0, 110);
+  rect(x + 3, y + 4, w, h, r);
+
+  // Button body
+  fill(selected ? color(255, 215, 0) : color(255, 255, 255, 215));
+  rect(x, y, w, h, r);
+
+  // Top shine
+  fill(255, 255, 255, selected ? 55 : 95);
+  rect(x + 4, y + 3, w - 8, h * 0.45, r);
+
+  // Label
+  textAlign(CENTER, CENTER);
+  let fs = max(10, min(h * 0.42, w / label.length * 1.6));
+  textSize(fs);
+  textStyle(BOLD);
+  fill(selected ? color(20) : color(50));
+  noStroke();
+  text(label, x + w / 2, y + h / 2);
+  textStyle(NORMAL);
   pop();
 }
 

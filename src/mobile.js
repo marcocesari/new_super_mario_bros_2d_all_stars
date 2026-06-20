@@ -49,6 +49,15 @@ function tryResumeAudio() {
 let _gestureHandled = false;
 function handleFirstGesture() {
   tryResumeAudio();
+  // Ensure the menu video plays on iOS (requires a user gesture).
+  // currentTime > 0 means the loadedmetadata handler already sought to the
+  // action start; if it's still 0 just leave it (metadata not ready yet).
+  if (menuVideo && menuVideo.elt.paused) {
+    try {
+      let p = menuVideo.elt.play();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (_) {}
+  }
   if (_gestureHandled) return;
   _gestureHandled = true;
   // Fullscreen + landscape-lock only on touch devices — desktop users are
@@ -361,10 +370,45 @@ function _drawFaceButton(cx, cy, r, label, rgb, held) {
   textStyle(NORMAL);
 }
 
-// Called on any touch while game is NOT in 'playing'. Collapses the menus
-// into a single tap-to-start flow so a phone without a keyboard can play.
-// Returns true if it consumed the tap.
+// Returns true if a point (x,y) falls inside rect {x,y,w,h}.
+function _ptInRect(px, py, r) {
+  return r && px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+}
+
+// Called on any touch/click while game is NOT in 'playing'. On the main menu
+// it checks which button was tapped; on other screens it collapses into a
+// single tap-to-advance flow.
+// Returns true if it consumed the event.
 function handleMenuTouchAdvance() {
+  // Build a list of interaction points (touches on mobile, mouse on desktop).
+  let pts = [];
+  if (isTouchDevice) {
+    for (let t of touches) pts.push({ x: t.x, y: t.y });
+  } else {
+    pts.push({ x: mouseX, y: mouseY });
+  }
+
+  if (game.state === 'menu') {
+    // Route tap/click to whichever button it lands on.
+    for (let pt of pts) {
+      if (_ptInRect(pt.x, pt.y, _menuBtnRects.controller)) {
+        useController = true;
+        game.state = 'controllerConnect';
+        return true;
+      }
+      if (_ptInRect(pt.x, pt.y, _menuBtnRects.keyboard)) {
+        useController = false;
+        twoPlayer = false;
+        game.state = 'playerSelect';
+        playerSelectChoice = 0;
+        return true;
+      }
+    }
+    // Tap that missed both buttons — do nothing.
+    return false;
+  }
+
+  // For all other overlay states, only honour touch on touch-devices.
   if (!isTouchDevice) return false;
 
   if (game.state === 'menu' || game.state === 'controllerConnect' || game.state === 'playerSelect') {

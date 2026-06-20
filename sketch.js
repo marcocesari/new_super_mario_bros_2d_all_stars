@@ -5,6 +5,8 @@ let marioSheet, blocksSheet, enemiesSheet, yoshiSheet, rideSheet, eatSheet;
 
 // Sounds (keyed for easy iteration in stopAllSounds)
 let sounds = {
+  homeMenu: null,
+  playerSelect: null,
   music: null,
   music2: null,
   music3: null,
@@ -16,6 +18,9 @@ let sounds = {
 
 // Kept outside `sounds` so stopAllSounds() never touches it.
 let yoshiHatchSound = null;
+
+// Menu background video (left half of title screen)
+let menuVideo = null;
 
 // Game state
 let game = {
@@ -68,6 +73,8 @@ function preload() {
   eatSheet = loadImage('assets/yoshi_eat.png');
   // Pass error callback so a single failed decode (common on iOS Safari)
   // doesn't leave preload hanging — the game starts muted for that track.
+  loadSoundSafe('homeMenu',      'assets/audio/home_menu_theme.mp3');
+  loadSoundSafe('playerSelect',  'assets/audio/file_and_player_select.mp3');
   loadSoundSafe('music',         'assets/audio/music_ground.mp3');
   loadSoundSafe('music2',        'assets/audio/music_player_select.mp3');
   loadSoundSafe('music3',        'assets/audio/music_overworld.mp3');
@@ -86,9 +93,6 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   noSmooth();
   game.currentLevel = 0;
-  // Force the AudioContext into existence (suspended) so p5.sound can
-  // register its AudioWorklet. We do NOT resume it here — that requires a
-  // user gesture on iOS and is handled by handleFirstGesture() on first tap.
   try { getAudioContext(); } catch (e) { /* ignore */ }
   // iOS native host (WKWebView + GamepadBridge.swift): preset the standard
   // W3C gamepad mapping so the player skips the manual mapping flow. No-op
@@ -104,6 +108,36 @@ function setup() {
     gpMapping.left = -1;       // use analog stick
     gpMapping.right = -1;
   }
+
+  // Menu background video — muted + playsinline so it autoplays on iOS PWA.
+  // Adjust MENU_VIDEO_START_SEC to skip the intro and begin on the action.
+  const MENU_VIDEO_START_SEC = 3;
+
+  try {
+    menuVideo = createVideo(
+      'assets/audio/Screen%20Recording%202026-04-25%20at%2020.28.04.mov'
+    );
+    menuVideo.attribute('playsinline', '');
+    menuVideo.attribute('muted', '');
+    menuVideo.volume(0);
+    menuVideo.hide();
+
+    // Once metadata is ready, seek to the action start and begin playing.
+    menuVideo.elt.addEventListener('loadedmetadata', () => {
+      menuVideo.elt.currentTime = MENU_VIDEO_START_SEC;
+    });
+
+    // When the video ends, loop back to the action start (not time 0).
+    menuVideo.elt.addEventListener('ended', () => {
+      menuVideo.elt.currentTime = MENU_VIDEO_START_SEC;
+      let rp = menuVideo.elt.play();
+      if (rp && typeof rp.catch === 'function') rp.catch(() => {});
+    });
+
+    // Attempt immediate playback (works on desktop; iOS needs a gesture).
+    let vp = menuVideo.elt.play();
+    if (vp && typeof vp.catch === 'function') vp.catch(() => {});
+  } catch (e) { menuVideo = null; }
 }
 
 function windowResized() {
@@ -120,8 +154,7 @@ function touchStarted() {
 }
 function mousePressed() {
   handleFirstGesture();
-  // On a touchscreen device, the synthesized mouse click would advance the
-  // menu a second time — touchStarted already handled it.
+  // Suppress synthesized mouse events on touch devices (touchStarted handles those).
   if (!isTouchDevice) handleMenuTouchAdvance();
 }
 
@@ -137,8 +170,10 @@ function draw() {
   updateTouchControls();
   _watchLevelMusic();
 
-  if (game.state === 'menu') { drawMenu(); return; }
-  if (game.state === 'playerSelect') { drawPlayerSelect(); return; }
+  if (game.state === 'menu') { stopScreenMusic('playerSelect'); playScreenMusic('homeMenu'); drawMenu(); return; }
+  stopScreenMusic('homeMenu');
+  if (game.state === 'playerSelect') { playScreenMusic('playerSelect'); drawPlayerSelect(); return; }
+  stopScreenMusic('playerSelect');
   if (game.state === 'controllerConnect') { drawControllerConnect(); return; }
 
   let bg = LEVEL_THEMES[game.currentLevel].bg;

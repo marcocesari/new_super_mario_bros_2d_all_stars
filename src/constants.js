@@ -9,7 +9,7 @@ const GRAVITY = 0.6;
 const SPRITE_STRIDE = 18; // sprite grid cell size (pixels) in mario_and_items.png and enemies.png
 
 // ── Physics ──
-const PLAYER_SPEED = 3;
+const PLAYER_SPEED = 4.2;
 const RIDING_SPEED = 4.5;
 const JUMP_FORCE = -17;
 const STOMP_BOUNCE = -8;

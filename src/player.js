@@ -119,7 +119,7 @@ function updatePlayer(player) {
     if (levelData[r][playerCol] === 'flag') {
       game.state = 'levelComplete';
       stopAllSounds();
-      if (sounds.levelComplete) sounds.levelComplete.play();
+      if (sounds.levelComplete) playSoundSafe(sounds.levelComplete);
       return;
     }
   }

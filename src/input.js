@@ -213,6 +213,26 @@ const LEVEL_MUSIC_LOOP_GAP_MS = 500;
 let activeLevelMusic = null;
 let levelMusicLoopTimer = null;
 
+// Plays a sound safely on mobile: resumes the AudioContext first if it has
+// been suspended (iOS backgrounding), then plays. Falls back to a direct
+// .play() if the resume API isn't available.
+function playSoundSafe(sound) {
+  if (!sound) return;
+  let ctx = null;
+  try { ctx = getAudioContext(); } catch (e) {}
+  if (ctx && ctx.state !== 'running' && typeof ctx.resume === 'function') {
+    let r = ctx.resume();
+    if (r && typeof r.then === 'function') {
+      r.then(() => { try { sound.play(); } catch (e) {} })
+       .catch(() => { try { sound.play(); } catch (e) {} });
+    } else {
+      try { sound.play(); } catch (e) {}
+    }
+  } else {
+    try { sound.play(); } catch (e) {}
+  }
+}
+
 function stopAllSounds() {
   for (let key in sounds) {
     if (sounds[key] && sounds[key].isPlaying()) sounds[key].stop();
@@ -222,6 +242,25 @@ function stopAllSounds() {
     levelMusicLoopTimer = null;
   }
   activeLevelMusic = null;
+}
+
+// Looping background theme for a menu/setup screen (e.g. the home screen or
+// the player-count chooser). Only starts once the AudioContext is actually
+// running so we never queue overlapping playbacks while audio is still locked
+// (pre-gesture).
+function playScreenMusic(key) {
+  let m = sounds[key];
+  if (!m || m.isPlaying()) return;
+  let ctx = null;
+  try { ctx = getAudioContext(); } catch (e) { /* ignore */ }
+  if (!ctx || ctx.state !== 'running') return; // wait until audio is unlocked
+  m.setVolume(0.5);
+  m.setLoop(true);
+  m.play();
+}
+
+function stopScreenMusic(key) {
+  if (sounds[key] && sounds[key].isPlaying()) sounds[key].stop();
 }
 
 function playLevelMusic() {
@@ -265,7 +304,7 @@ function playLevelMusic() {
     levelMusicLoopTimer = setTimeout(() => {
       levelMusicLoopTimer = null;
       if (activeLevelMusic === levelMusic && game.state === 'playing') {
-        levelMusic.play();
+        playSoundSafe(levelMusic);
       }
     }, LEVEL_MUSIC_LOOP_GAP_MS);
   });
@@ -365,7 +404,8 @@ function keyPressed() {
 
   // Menu navigation
   if (game.state === 'menu') {
-    if (keyCode === UP_ARROW || keyCode === DOWN_ARROW) {
+    if (keyCode === LEFT_ARROW  || keyCode === RIGHT_ARROW ||
+        keyCode === UP_ARROW    || keyCode === DOWN_ARROW) {
       menuSelection = 1 - menuSelection;
     }
     if (keyCode === ENTER) {
