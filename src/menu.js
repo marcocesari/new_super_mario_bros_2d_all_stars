@@ -46,8 +46,13 @@ let _menuSprTimer  = 0;
 
 // Button bounding boxes, populated each frame and read by mobile touch handler.
 let _menuBtnRects = { controller: null, keyboard: null };
+let _psBtnRects   = { one: null, two: null };
 
-function drawMenu() {
+
+// Shared title-screen backdrop: black base, sky-blue left panel, clipped video
+// on the right, and the soft blue fade divider. Used by both the main menu and
+// the player-select screen so they share one look.
+function _drawMenuBackdrop() {
   // ── Right half: black background (video will draw on top) ─────────────────
   background(0);
 
@@ -76,13 +81,12 @@ function drawMenu() {
     } catch (_) {}
   }
 
-  // ── Centre: wavy gradient divider ─────────────────────────────────────────
+  // ── Centre: soft blue fade divider ────────────────────────────────────────
   _drawMenuDivider();
+}
 
-  // ── Left half: sprite + title + buttons ───────────────────────────────────
-  _drawMenuLeftPanel();
-
-  // Version tag (top-left corner)
+// Version tag (top-left corner), shared across title screens.
+function _drawVersionTag() {
   push();
   textAlign(LEFT, TOP);
   textSize(11);
@@ -92,52 +96,60 @@ function drawMenu() {
   pop();
 }
 
+function drawMenu() {
+  _drawMenuBackdrop();
+
+  // ── Left half: sprite + title + buttons ───────────────────────────────────
+  _drawMenuLeftPanel();
+
+  _drawVersionTag();
+}
+
 function _drawMenuDivider() {
   let cx = width / 2;
 
-  // Gradient: opaque sky (left) → transparent sky (right), fading into the video
   drawingContext.save();
-  let grad = drawingContext.createLinearGradient(cx - 20, 0, cx + 80, 0);
-  grad.addColorStop(0, 'rgba(92,148,252,1)');
-  grad.addColorStop(1, 'rgba(92,148,252,0)');
-  drawingContext.fillStyle = grad;
-  drawingContext.fillRect(cx - 20, 0, 100, height);
-  drawingContext.restore();
 
-  // Animated sine-wave line
-  push();
-  noFill();
-  stroke(255, 255, 255, 120);
-  strokeWeight(2.5);
-  beginShape();
-  for (let y = 0; y <= height; y += 4) {
-    let amp = 12 * (0.7 + 0.3 * sin(y * 0.012));
-    let x   = (cx - 32) + sin(y * 0.038 + frameCount * 0.045) * amp;
-    vertex(x, y);
-  }
-  endShape();
-  pop();
+  // Long, even linear fade — like the reference gradient, but blue instead of
+  // black. Solid blue holds up to the seam, then ramps evenly to fully
+  // transparent partway across the video, so the dissolve is gentle and wide.
+  let fadeEnd = cx + min(width * 0.17, 220);   // where blue reaches transparent
+  let grad = drawingContext.createLinearGradient(cx, 0, fadeEnd, 0);
+  grad.addColorStop(0.0, 'rgba(92,148,252,1)');  // solid blue (at the seam)
+  grad.addColorStop(1.0, 'rgba(92,148,252,0)');  // fully transparent (right)
+  drawingContext.fillStyle = grad;
+  drawingContext.fillRect(cx, 0, fadeEnd - cx, height);
+
+  drawingContext.restore();
+}
+
+// Animated Mario-on-Yoshi sprite. Drawn BEHIND the title/content so the writing
+// sits on top of it. `centerX` defaults to the left-panel center.
+function _drawMenuSprite(centerX) {
+  let pw = width / 2, ph = height;
+  if (centerX === undefined) centerX = pw * 0.5;
+
+  // Animate Mario-on-Yoshi (3-frame walk cycle, 10 ticks/frame)
+  _menuSprTimer++;
+  if (_menuSprTimer >= 10) { _menuSprTimer = 0; _menuSprFrame = (_menuSprFrame + 1) % RIDE_FRAMES.length; }
+
+  let sprSize = min(pw, ph);
+  let sprX    = centerX - sprSize / 2;        // centered on centerX
+  let sprY    = ph * 0.5 - sprSize / 2;       // centered vertically
+  try {
+    let rf = RIDE_FRAMES[_menuSprFrame];
+    image(rideSheet, sprX, sprY, sprSize, sprSize, rf.x, rf.y, rf.w, rf.h);
+  } catch (_) {}
 }
 
 function _drawMenuLeftPanel() {
   let pw = width  / 2;  // left panel width
   let ph = height;
 
-  // Animate Mario-on-Yoshi (3-frame walk cycle, 10 ticks/frame)
-  _menuSprTimer++;
-  if (_menuSprTimer >= 10) { _menuSprTimer = 0; _menuSprFrame = (_menuSprFrame + 1) % RIDE_FRAMES.length; }
+  _drawMenuSprite();
 
-  // ── Mario-on-Yoshi sprite (upper-right of left panel) ──
-  let sprSize = min(pw * 0.46, ph * 0.44);
-  let sprX    = pw * 0.54;
-  let sprY    = ph * 0.04;
-  try {
-    let rf = RIDE_FRAMES[_menuSprFrame];
-    image(rideSheet, sprX, sprY, sprSize, sprSize, rf.x, rf.y, rf.w, rf.h);
-  } catch (_) {}
-
-  // ── Title (upper-left of left panel) ──
-  _drawMenuTitle(pw * 0.28, ph * 0.07, pw * 0.48);
+  // ── Title (centered in the left panel) — drawn on top of the sprite ──
+  _drawMenuTitle(pw * 0.5, ph * 0.07, pw * 0.48);
 
   // ── Pill buttons (lower half, centered in left panel) ──
   _drawMenuButtons(pw / 2, ph * 0.73, pw);
@@ -360,6 +372,19 @@ function _drawAllStarsEmblem(ctx, cx, topY, w) {
 }
 
 function _drawMenuTitle(cx, startY, maxW) {
+  // Preferred path: the real logo wordmark (assets PNG). Drawn centered on cx,
+  // top-aligned at startY, scaled to fit the title's width while preserving
+  // aspect. Falls back to the code-drawn logo below if the image is missing.
+  if (logoImage && logoImage.width > 0) {
+    const drawW = maxW * 1.18;               // the badge/extrudes spill past maxW
+    const drawH = drawW * (logoImage.height / logoImage.width);
+    push();
+    imageMode(CORNER);
+    image(logoImage, cx - drawW / 2, startY, drawW, drawH);
+    pop();
+    return;
+  }
+
   const ctx = drawingContext;
   ctx.save();
   let y = startY;
@@ -393,14 +418,19 @@ function _drawMenuButtons(cx, centerY, rw) {
   let btnH = min(height * 0.075, 50);
   let gap  = 16;
 
-  let b0x = cx - gap / 2 - btnW;
-  let b1x = cx + gap / 2;
+  // The controller button gets a wider box to comfortably fit its label.
+  let ctrlW = min(rw * 0.52, 260);
+
+  // Keep the pair centered around cx.
+  let totalW = ctrlW + gap + btnW;
+  let b0x = cx - totalW / 2;
+  let b1x = b0x + ctrlW + gap;
   let by  = centerY - btnH / 2;
 
-  _menuBtnRects.controller = { x: b0x, y: by, w: btnW, h: btnH };
+  _menuBtnRects.controller = { x: b0x, y: by, w: ctrlW, h: btnH };
   _menuBtnRects.keyboard   = { x: b1x, y: by, w: btnW, h: btnH };
 
-  _drawMenuPillBtn('GRAB A CONTROLLER', b0x, by, btnW, btnH, menuSelection === 0);
+  _drawMenuPillBtn('GRAB A CONTROLLER', b0x, by, ctrlW, btnH, menuSelection === 0);
   _drawMenuPillBtn('GO KEYBOARD!',       b1x, by, btnW, btnH, menuSelection === 1);
 
   // Navigation hint below buttons
@@ -423,20 +453,36 @@ function _drawMenuPillBtn(label, x, y, w, h, selected) {
   fill(0, 0, 0, 110);
   rect(x + 3, y + 4, w, h, r);
 
-  // Button body
-  fill(selected ? color(255, 215, 0) : color(255, 255, 255, 215));
+  // Selected: a glowing yellow line that rings the whole box (same yellow as
+  // the fill). Drawn as an outer stroked pill just behind the body.
+  if (selected) {
+    noFill();
+    stroke(255, 215, 0);
+    strokeWeight(4);
+    rect(x - 3, y - 3, w + 6, h + 6, r + 3);
+    noStroke();
+  }
+
+  // Button body — yellow when the player is on it, gray otherwise.
+  fill(selected ? color(255, 215, 0) : color(150, 150, 150));
   rect(x, y, w, h, r);
 
   // Top shine
-  fill(255, 255, 255, selected ? 55 : 95);
+  fill(255, 255, 255, selected ? 55 : 70);
   rect(x + 4, y + 3, w - 8, h * 0.45, r);
 
-  // Label
+  // Label — fit it inside the pill (with horizontal padding)
   textAlign(CENTER, CENTER);
-  let fs = max(10, min(h * 0.42, w / label.length * 1.6));
-  textSize(fs);
   textStyle(BOLD);
-  fill(selected ? color(20) : color(50));
+  let fs = min(h * 0.42, w / label.length * 1.6);
+  textSize(fs);
+  const maxTextW = w - h * 0.7; // keep clear of the rounded ends
+  const tw = textWidth(label);
+  if (tw > maxTextW) {
+    fs = max(8, fs * maxTextW / tw);
+    textSize(fs);
+  }
+  fill(selected ? color(20) : color(245));
   noStroke();
   text(label, x + w / 2, y + h / 2);
   textStyle(NORMAL);
@@ -445,39 +491,85 @@ function _drawMenuPillBtn(label, x, y, w, h, selected) {
 
 // ── Player select ──
 
+// Two pill buttons ("1 PLAYER" / "2 PLAYERS") sharing the main-menu styling.
+function _drawPlayerButtons(cx, centerY, rw) {
+  let btnW = min(rw * 0.5, 240);
+  let btnH = min(height * 0.075, 50);
+  let vgap = 84;
+
+  let bx     = cx - btnW / 2;
+  let totalH = btnH * 2 + vgap;
+  let y0     = centerY - totalH / 2;        // top button
+  let y1     = y0 + btnH + vgap;            // bottom button
+
+  _psBtnRects.one = { x: bx, y: y0, w: btnW, h: btnH };
+  _psBtnRects.two = { x: bx, y: y1, w: btnW, h: btnH };
+
+  _drawMenuPillBtn('1 PLAYER',  bx, y0, btnW, btnH, playerSelectChoice === 0);
+  _drawMenuPillBtn('2 PLAYERS', bx, y1, btnW, btnH, playerSelectChoice === 1);
+
+  return { by: y1, btnH };                  // bottom button, for info placement
+}
+
 function drawPlayerSelect() {
-  background(0);
-  fill(255);
-  noStroke();
+  let pw = width / 2, ph = height;
+
+  // Plain sky-blue background here — no video, no fade divider. The logo is
+  // smaller and tucked into the top-left corner.
+  background(125, 38, 40);         // dark-red fabric tone
+  _drawMenuSprite(width * 0.75);   // big Mario & Yoshi on the right side
+  let logoMaxW  = pw * 0.34;
+  let logoDrawW = logoMaxW * 1.18;       // matches _drawMenuTitle's image scale
+  _drawMenuTitle(10 + logoDrawW / 2, 10, logoMaxW);
+
+  // Vertical anchors: the heading up top and the controls hint down the
+  // bottom. The buttons are centered in the gap between them.
+  let headingY  = ph * 0.38;
+  let controlsY = ph * 0.90;
+
+  // Heading.
+  push();
   textAlign(CENTER, CENTER);
+  textStyle(BOLD);
+  textSize(max(16, min(28, height * 0.046)));
+  stroke(0); strokeWeight(4); strokeJoin(ROUND);
+  fill(255);
+  text('HOW MANY PLAYERS?', pw * 0.5, headingY);
+  pop();
 
-  textSize(36);
-  text('HOW MANY PLAYERS?', width / 2, 100);
+  // Pill buttons (same look as the controller/keyboard pills), stacked on the
+  // left side of the screen, vertically centered between the heading and the
+  // controls hint.
+  let psBtnW = min(pw * 0.5, 240);
+  let psCx   = width * 0.16 + psBtnW / 2;     // left-anchored, nudged right
+  const { by, btnH } = _drawPlayerButtons(psCx, (headingY + controlsY) / 2, pw);
 
-  textSize(22);
-  drawMenuOption('1 PLAYER', 260, playerSelectChoice === 0);
-  drawMenuOption('2 PLAYERS', 310, playerSelectChoice === 1);
-
+  // Per-player control hint (only relevant in 2-player mode).
+  push();
+  textAlign(CENTER, TOP);
+  textStyle(BOLD);
+  noStroke();
+  let infoY = by + btnH + 12;
   if (playerSelectChoice === 1) {
-    textSize(16);
-    fill(220, 50, 50);
-    if (useController) {
-      text('P1 (MARIO): Controller', width / 2, 390);
-    } else {
-      text('P1 (MARIO): Arrow keys + SPACE', width / 2, 390);
-    }
-    fill(50, 200, 50);
-    text('P2 (LUIGI): A/D + W to jump', width / 2, 415);
+    textSize(max(11, min(15, height * 0.02)));
+    fill(255, 90, 90);
+    text(useController ? 'P1 (MARIO): Controller'
+                       : 'P1 (MARIO): Arrow keys + SPACE', psCx, infoY);
+    fill(120, 230, 120);
+    text('P2 (LUIGI): A/D + W to jump', psCx, infoY + 20);
   }
+  pop();
 
-  fill(180);
-  textSize(14);
-  if (useController) {
-    text('Use joystick and buttons to select', width / 2, 480);
-  } else {
-    text('Use UP/DOWN arrows and ENTER to select', width / 2, 480);
-  }
-  text('Press ESC to go back', width / 2, 505);
+  // Navigation hint below.
+  push();
+  textAlign(CENTER, TOP);
+  textSize(max(10, min(13, height * 0.017)));
+  fill(190, 215, 255);
+  noStroke();
+  text('▲ ▼ PICK PLAYERS   •   ENTER = START   •   ESC = BACK', pw * 0.5, controlsY);
+  pop();
+
+  _drawVersionTag();
 
   // Poll gamepad for navigation on this screen
   if (useController) {
@@ -485,16 +577,70 @@ function drawPlayerSelect() {
   }
 }
 
+// ── Between-level loading screen ──
+
+// Black screen with the animated Mario-on-Yoshi sprite running in the bottom-
+// left corner, matching the startup loading screen.
+function drawLoading() {
+  background(0);
+
+  // Advance the ride walk-cycle (slightly faster than the menu sprite).
+  _menuSprTimer++;
+  if (_menuSprTimer >= 8) { _menuSprTimer = 0; _menuSprFrame = (_menuSprFrame + 1) % RIDE_FRAMES.length; }
+
+  let sz = min(width, height) * 0.22;
+  let x  = max(24, width * 0.04);
+  let y  = height - sz - max(24, height * 0.05);
+  try {
+    let rf = RIDE_FRAMES[_menuSprFrame];
+    image(rideSheet, x, y, sz, sz, rf.x, rf.y, rf.w, rf.h);
+  } catch (_) {}
+
+  // "LOADING" with animated dots, just above the sprite.
+  push();
+  textAlign(LEFT, BOTTOM);
+  textStyle(BOLD);
+  noStroke();
+  fill(255);
+  textSize(max(18, min(30, height * 0.04)));
+  let dots = '.'.repeat(floor(frameCount / 18) % 4);
+  text('LOADING' + dots, x + 6, y - 6);
+  textStyle(NORMAL);
+  pop();
+}
+
 // ── Controller connect (Gamepad API) ──
 
+// Shared dark-red backdrop for the controller-setup screen, matching the
+// player-select look: red fabric tone, big Mario-on-Yoshi on the right, small
+// logo tucked top-left. Returns the content-column center x (`cx`) used to lay
+// the text out on the left side, clear of the sprite.
+function _drawControllerBackdrop() {
+  background(125, 38, 40);                 // dark-red, like player-select
+  _drawMenuSprite(width * 0.78);           // big Mario & Yoshi on the right
+
+  let pw = width / 2;
+  let logoMaxW  = pw * 0.34;
+  let logoDrawW = logoMaxW * 1.18;
+  _drawMenuTitle(10 + logoDrawW / 2, 10, logoMaxW);
+
+  return width * 0.28;                     // content column center (left side)
+}
+
 function drawControllerConnect() {
-  background(0);
-  fill(255);
+  let cx = _drawControllerBackdrop();
+
   noStroke();
   textAlign(CENTER, CENTER);
 
-  textSize(28);
-  text('CONTROLLER SETUP', width / 2, 60);
+  // Heading — same position and style as the player-select "HOW MANY PLAYERS?".
+  push();
+  textStyle(BOLD);
+  textSize(max(16, min(28, height * 0.046)));
+  stroke(0); strokeWeight(4); strokeJoin(ROUND);
+  fill(255);
+  text('CONTROLLER SETUP', width / 4, height * 0.38);
+  pop();
 
   if (gpMapCooldown > 0) gpMapCooldown--;
 
@@ -502,25 +648,33 @@ function drawControllerConnect() {
   if (gpDetectPhase) {
     let gp = getGamepad();
 
-    textSize(16);
-    fill(180);
-    text('1. Open System Settings > Bluetooth', width / 2, 120);
-    text('2. Turn on your controller (hold power button)', width / 2, 145);
-    text('3. Pair it when it appears in the Bluetooth list', width / 2, 170);
-    text('4. Once connected, press any button below', width / 2, 195);
+    // Bigger title above the steps.
+    push();
+    textStyle(BOLD);
+    textSize(max(20, min(30, width * 0.034)));
+    fill(255);
+    text('HOW TO SET UP', width * 0.42, 40);
+    pop();
+
+    textSize(15);
+    fill(235);
+    text('1. Open System Settings > Bluetooth', width * 0.42, 88);
+    text('2. Turn on your controller (hold power button)', width * 0.42, 112);
+    text('3. Pair it when it appears in the Bluetooth list', width * 0.42, 136);
+    text('4. Once connected, press any button below', width * 0.42, 160);
 
     // Pulsing dots animation
     let dots = '.'.repeat((floor(frameCount / 20) % 3) + 1);
-    textSize(28);
+    textSize(24);
     fill(255, 220, 50);
-    text('Waiting for controller' + dots, width / 2, 270);
+    text('Waiting for controller' + dots, cx, 270);
 
     if (gp) {
       // Draw detected controller info
       textSize(14);
-      fill(50, 255, 100);
-      text('Detected: ' + gp.id.substring(0, 50), width / 2, 340);
-      text(gp.buttons.length + ' buttons, ' + gp.axes.length + ' axes', width / 2, 360);
+      fill(120, 255, 150);
+      text('Detected: ' + gp.id.substring(0, 50), cx, 340);
+      text(gp.buttons.length + ' buttons, ' + gp.axes.length + ' axes', cx, 360);
 
       // Check if any button is pressed to proceed
       for (let i = 0; i < gp.buttons.length; i++) {
@@ -539,9 +693,9 @@ function drawControllerConnect() {
       }
     }
 
-    fill(100);
+    fill(220, 180, 180);
     textSize(14);
-    text('Press ESC to go back', width / 2, 520);
+    text('Press ESC to go back', cx, 520);
     return;
   }
 
@@ -549,32 +703,32 @@ function drawControllerConnect() {
   if (!gpMapped) {
     let gp = getGamepad();
 
-    textSize(16);
-    fill(180);
-    text('Map each control. For LEFT / RIGHT you can either', width / 2, 110);
-    text('press a button OR tilt the analog stick to skip.', width / 2, 130);
+    textSize(15);
+    fill(235);
+    text('Map each control. For LEFT / RIGHT you can either', width * 0.42, 30);
+    text('press a button OR tilt the analog stick to skip.', width * 0.42, 54);
 
     if (gpMapCooldown > 0) {
       textSize(22);
-      fill(100);
-      text('OK! Next...', width / 2, 250);
+      fill(220, 180, 180);
+      text('OK! Next...', cx, 250);
     } else {
       textSize(22);
       fill(255, 220, 50);
-      text('Press the button for:', width / 2, 210);
-      textSize(42);
-      fill(50, 255, 100);
-      text(GP_MAP_LABELS[gpMapStep], width / 2, 280);
+      text('Press the button for:', cx, 210);
+      textSize(min(34, width * 0.04));
+      fill(120, 255, 150);
+      text(GP_MAP_LABELS[gpMapStep], cx, 280);
     }
 
     // Show already mapped
     textSize(14);
     let y = 350;
     for (let i = 0; i < gpMapStep; i++) {
-      fill(50, 200, 50);
+      fill(120, 235, 130);
       let val = gpMapping[GP_MAP_NAMES[i]];
       let valText = val < 0 ? 'Joystick' : ('Button ' + val);
-      text('\u2713 ' + GP_MAP_LABELS[i] + '  =  ' + valText, width / 2, y);
+      text('\u2713 ' + GP_MAP_LABELS[i] + '  =  ' + valText, cx, y);
       y += 22;
     }
 
@@ -629,9 +783,9 @@ function drawControllerConnect() {
       }
     }
 
-    fill(100);
+    fill(220, 180, 180);
     textSize(14);
-    text('Press ESC to go back', width / 2, 520);
+    text('Press ESC to go back', cx, 520);
     return;
   }
 
@@ -639,25 +793,25 @@ function drawControllerConnect() {
   let gp = getGamepad();
 
   textSize(22);
-  fill(50, 255, 100);
-  text('Controller ready!', width / 2, 130);
+  fill(120, 255, 150);
+  text('Controller ready!', cx, 130);
 
   textSize(13);
-  fill(200);
+  fill(235);
   let fmtBtn = (v) => v < 0 ? 'Joystick' : ('Button ' + v);
-  text('LEFT:  ' + fmtBtn(gpMapping.left), width / 2, 165);
-  text('RIGHT:  ' + fmtBtn(gpMapping.right), width / 2, 183);
-  text('JUMP:  Button ' + gpMapping.jump, width / 2, 201);
-  text('YOSHI EAT:  Button ' + gpMapping.eat, width / 2, 219);
-  text('GET OFF YOSHI:  Button ' + gpMapping.dismount, width / 2, 237);
-  text('CALL YOSHI:  Button ' + gpMapping.callYoshi, width / 2, 255);
-  text('RESTART:  Button ' + gpMapping.start, width / 2, 273);
+  text('LEFT:  ' + fmtBtn(gpMapping.left), cx, 165);
+  text('RIGHT:  ' + fmtBtn(gpMapping.right), cx, 183);
+  text('JUMP:  Button ' + gpMapping.jump, cx, 201);
+  text('YOSHI EAT:  Button ' + gpMapping.eat, cx, 219);
+  text('GET OFF YOSHI:  Button ' + gpMapping.dismount, cx, 237);
+  text('CALL YOSHI:  Button ' + gpMapping.callYoshi, cx, 255);
+  text('RESTART:  Button ' + gpMapping.start, cx, 273);
 
   // Live test display
   if (gp) {
     textSize(14);
-    fill(150);
-    text('-- Live test --', width / 2, 300);
+    fill(210, 170, 170);
+    text('-- Live test --', cx, 300);
 
     // Use the same multi-axis scan + d-pad/button fallbacks as in-game
     let axisX = readGamepadAxisX(gp);
@@ -673,41 +827,41 @@ function drawControllerConnect() {
     // Draw joystick indicator
     let testY = 350;
     let barW = 200;
-    let barX = width / 2 - barW / 2;
-    fill(60);
+    let barX = cx - barW / 2;
+    fill(90, 30, 32);
     noStroke();
     rect(barX, testY, barW, 20, 5);
     // Position dot reflects analog tilt or full-deflection if buttons used
     let visX = axisX;
     if (mappedL || dpadL) visX = -1;
     if (mappedR || dpadR) visX = 1;
-    let dotX = width / 2 + visX * (barW / 2);
-    fill(goingLeft || goingRight ? color(50, 255, 100) : color(150));
+    let dotX = cx + visX * (barW / 2);
+    fill(goingLeft || goingRight ? color(120, 255, 150) : color(210, 170, 170));
     ellipse(dotX, testY + 10, 16, 16);
 
     // Direction label
     textSize(14);
     fill(255);
     if (goingLeft) {
-      text('LEFT', width / 2, testY + 45);
+      text('LEFT', cx, testY + 45);
     } else if (goingRight) {
-      text('RIGHT', width / 2, testY + 45);
+      text('RIGHT', cx, testY + 45);
     } else {
-      fill(100);
-      text('NEUTRAL', width / 2, testY + 45);
+      fill(210, 170, 170);
+      text('NEUTRAL', cx, testY + 45);
     }
 
     // Button indicators
     let btnY = testY + 70;
-    fill(jumpBtn ? color(50, 255, 100) : color(80));
-    rect(width / 2 - 90, btnY, 80, 30, 5);
-    fill(startBtn ? color(50, 255, 100) : color(80));
-    rect(width / 2 + 10, btnY, 80, 30, 5);
+    fill(jumpBtn ? color(120, 255, 150) : color(90, 30, 32));
+    rect(cx - 90, btnY, 80, 30, 5);
+    fill(startBtn ? color(120, 255, 150) : color(90, 30, 32));
+    rect(cx + 10, btnY, 80, 30, 5);
 
     fill(255);
     textSize(12);
-    text('JUMP', width / 2 - 50, btnY + 15);
-    text('RESTART', width / 2 + 50, btnY + 15);
+    text('JUMP', cx - 50, btnY + 15);
+    text('RESTART', cx + 50, btnY + 15);
 
     // Check for jump button press to proceed
     let jumpPressed = gp.buttons[gpMapping.jump] && gp.buttons[gpMapping.jump].pressed;
@@ -725,11 +879,11 @@ function drawControllerConnect() {
 
   textSize(20);
   fill(255, 220, 50);
-  text('Press JUMP to continue!', width / 2, 490);
+  text('Press JUMP to continue!', cx, 490);
 
-  fill(100);
+  fill(220, 180, 180);
   textSize(14);
-  text('Press ESC to remap', width / 2, 520);
+  text('Press ESC to remap', cx, 520);
 }
 
 // ── Gamepad navigation for menus ──
@@ -744,10 +898,11 @@ function pollMenuGamepad() {
   if (gpMenuCooldown > 0) { gpMenuCooldown--; return; }
 
   let axisY = gp.axes[1] || 0;
+  let axisX = gp.axes[0] || 0;
 
-  // Joystick up/down to navigate
+  // Joystick (either axis) to navigate the two pills
   if (game.state === 'playerSelect') {
-    if (axisY < -0.5 || axisY > 0.5) {
+    if (axisY < -0.5 || axisY > 0.5 || axisX < -0.5 || axisX > 0.5) {
       playerSelectChoice = 1 - playerSelectChoice;
       gpMenuCooldown = 15;
     }

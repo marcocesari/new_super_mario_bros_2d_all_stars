@@ -408,6 +408,18 @@ function handleMenuTouchAdvance() {
     return false;
   }
 
+  if (game.state === 'playerSelect') {
+    // Route tap/click to whichever player pill it lands on, then start.
+    for (let pt of pts) {
+      if (_ptInRect(pt.x, pt.y, _psBtnRects.one)) {
+        playerSelectChoice = 0; twoPlayer = false; startGame(); return true;
+      }
+      if (_ptInRect(pt.x, pt.y, _psBtnRects.two)) {
+        playerSelectChoice = 1; twoPlayer = true; startGame(); return true;
+      }
+    }
+  }
+
   // For all other overlay states, only honour touch on touch-devices.
   if (!isTouchDevice) return false;
 
@@ -440,7 +452,7 @@ function handleMenuTouchAdvance() {
     stopAllSounds();
     if (game.currentLevel < LEVELS.length - 1) {
       game.currentLevel++;
-      loadLevel(LEVELS[game.currentLevel], true);
+      beginLevelLoad(LEVELS[game.currentLevel], true);
     } else {
       game.lives = 3;
       game.score = 0;

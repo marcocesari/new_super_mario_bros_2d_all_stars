@@ -36,6 +36,16 @@
   </head>
 
   <body>
+    <!-- Loading screen: p5 keeps this visible during preload() and removes it
+         automatically once all assets are loaded. Mario + Mario-on-Yoshi run
+         in the bottom-left corner. -->
+    <div id="p5_loading">
+      <div class="loading-text">LOADING</div>
+      <div class="loading-cast">
+        <div class="spr ride"></div>
+      </div>
+    </div>
+
     <!-- constants & data (load first) -->
     <script src="src/constants.js?v=22"></script>
     <script src="src/sprites.js?v=22"></script>

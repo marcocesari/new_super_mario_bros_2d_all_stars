@@ -73,7 +73,7 @@ function pollGamepad(player) {
     if (game.state === 'levelComplete' && game.currentLevel < LEVELS.length - 1) {
       stopAllSounds();
       game.currentLevel++;
-      loadLevel(LEVELS[game.currentLevel], true);
+      beginLevelLoad(LEVELS[game.currentLevel], true);
     }
   }
   gpJumpHeld = jumpBtn;
@@ -141,7 +141,7 @@ function executeOverlayAction(action) {
   stopAllSounds();
   if (action === 'next') {
     game.currentLevel++;
-    loadLevel(LEVELS[game.currentLevel], true);
+    beginLevelLoad(LEVELS[game.currentLevel], true);
   } else if (action === 'retry') {
     loadLevel(LEVELS[game.currentLevel]);
   } else if (action === 'menu') {
@@ -360,6 +360,14 @@ function applyPowerUps(player, snap) {
   }
 }
 
+// Show a brief "loading" interlude, then load the level. Used for level-to-
+// level transitions so there's a visible loading screen between levels.
+function beginLevelLoad(mapStrings, keepPowerUps) {
+  pendingLevel = { mapStrings, keepPowerUps: !!keepPowerUps };
+  loadingTimer = LOADING_FRAMES;
+  game.state = 'loading';
+}
+
 function loadLevel(mapStrings, keepPowerUps) {
   // Snapshot power-up state BEFORE wiping players/yoshis.
   let marioSnap = keepPowerUps ? snapshotPowerUps(mario) : null;
@@ -437,7 +445,8 @@ function keyPressed() {
 
   // Player select screen
   if (game.state === 'playerSelect') {
-    if (keyCode === UP_ARROW || keyCode === DOWN_ARROW) {
+    if (keyCode === UP_ARROW || keyCode === DOWN_ARROW ||
+        keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW) {
       playerSelectChoice = 1 - playerSelectChoice;
     }
     if (keyCode === ENTER) {
@@ -480,7 +489,7 @@ function keyPressed() {
   if ((isP1Jump || isP2Jump || isRestart) && game.state === 'levelComplete' && game.currentLevel < LEVELS.length - 1) {
     stopAllSounds();
     game.currentLevel++;
-    loadLevel(LEVELS[game.currentLevel], true);
+    beginLevelLoad(LEVELS[game.currentLevel], true);
   }
 
   // Restart when dead or game over

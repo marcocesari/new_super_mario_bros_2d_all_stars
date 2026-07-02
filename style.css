@@ -24,3 +24,59 @@ canvas {
   width: 100%;
   height: 100%;
 }
+
+/* ── Loading screen (shown by p5 during asset preload, then auto-removed) ── */
+#p5_loading {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 1000;
+  font-family: 'New Super Mario Font U', 'Arial Black', sans-serif;
+}
+
+/* Characters parked in the bottom-left corner. */
+#p5_loading .loading-cast {
+  position: absolute;
+  left: 28px;
+  bottom: 28px;
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+}
+
+#p5_loading .spr {
+  image-rendering: pixelated;
+  background-repeat: no-repeat;
+}
+
+/* Mario-on-Yoshi: mario_yoshi.png is 600×200 = three 200×200 frames. */
+#p5_loading .ride {
+  width: 132px;
+  height: 132px;
+  background-image: url('assets/mario_yoshi.png');
+  background-size: 396px 132px;            /* 3× the 600×200 sheet, scaled to fit */
+  animation: loadingRide 0.45s steps(3) infinite;
+}
+@keyframes loadingRide {
+  from { background-position-x: 0; }
+  to   { background-position-x: -396px; }  /* full scaled sheet width */
+}
+
+#p5_loading .loading-text {
+  position: absolute;
+  left: 30px;
+  bottom: 176px;
+  color: #fff;
+  font-size: 22px;
+  letter-spacing: 1px;
+}
+#p5_loading .loading-text::after {
+  content: '';
+  animation: loadingDots 1.2s steps(4, end) infinite;
+}
+@keyframes loadingDots {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+}

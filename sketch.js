@@ -3,6 +3,9 @@
 // Sprite sheets
 let marioSheet, blocksSheet, enemiesSheet, yoshiSheet, rideSheet, eatSheet;
 
+// Title-screen logo (full "New Super Mario Bros. 2D All Stars" wordmark)
+let logoImage = null;
+
 // Sounds (keyed for easy iteration in stopAllSounds)
 let sounds = {
   homeMenu: null,
@@ -57,6 +60,12 @@ let playerSelectChoice = 0;   // 0 = 1 player, 1 = 2 players
 let deathTimer = 0;
 let levelCompleteTimer = 0;
 
+// Between-level loading interlude: when advancing to the next level we show a
+// brief "LOADING" screen (Mario-on-Yoshi in the corner) before loadLevel runs.
+const LOADING_FRAMES = 75;    // ~1.25s at 60fps
+let loadingTimer = 0;
+let pendingLevel = null;      // { mapStrings, keepPowerUps }
+
 // Uniform scale applied to the world draw so the full level height fits the
 // screen (otherwise the ground row is cut off on short viewports like iPhone
 // landscape). Updated every frame in draw() before camera + world render.
@@ -71,6 +80,10 @@ function preload() {
   yoshiSheet = loadImage('assets/yoshi.png');
   rideSheet = loadImage('assets/mario_yoshi.png');
   eatSheet = loadImage('assets/yoshi_eat.png');
+  // Logo wordmark for the title screen. Failure falls back to the code-drawn
+  // logo (see _drawMenuTitle), so a missing/broken file never blocks the menu.
+  logoImage = loadImage('assets/New Super Mario Bros 2D All Stars.png',
+                        null, () => { logoImage = null; });
   // Pass error callback so a single failed decode (common on iOS Safari)
   // doesn't leave preload hanging — the game starts muted for that track.
   loadSoundSafe('homeMenu',      'assets/audio/home_menu_theme.mp3');
@@ -92,6 +105,15 @@ function loadSoundSafe(key, path) {
 function setup() {
   createCanvas(windowWidth, windowHeight);
   noSmooth();
+
+  // Use the New Super Mario Bros. font for ALL canvas text (the same face the
+  // loading screen uses). Applied globally so every text() call inherits it;
+  // re-applied once the webfont finishes loading in case it wasn't ready yet.
+  textFont('New Super Mario Font U');
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => { try { textFont('New Super Mario Font U'); } catch (e) {} });
+  }
+
   game.currentLevel = 0;
   try { getAudioContext(); } catch (e) { /* ignore */ }
   // iOS native host (WKWebView + GamepadBridge.swift): preset the standard
@@ -175,6 +197,17 @@ function draw() {
   if (game.state === 'playerSelect') { playScreenMusic('playerSelect'); drawPlayerSelect(); return; }
   stopScreenMusic('playerSelect');
   if (game.state === 'controllerConnect') { drawControllerConnect(); return; }
+
+  // Between-level loading interlude.
+  if (game.state === 'loading') {
+    drawLoading();
+    if (--loadingTimer <= 0 && pendingLevel) {
+      let p = pendingLevel;
+      pendingLevel = null;
+      loadLevel(p.mapStrings, p.keepPowerUps);   // sets state back to 'playing'
+    }
+    return;
+  }
 
   let bg = LEVEL_THEMES[game.currentLevel].bg;
   background(bg[0], bg[1], bg[2]);
