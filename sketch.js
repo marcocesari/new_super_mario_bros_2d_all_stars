@@ -17,10 +17,16 @@ let sounds = {
   gameOver: null,
   levelComplete: null,
   coin: null,
+  powerUp: null,
 };
 
 // Kept outside `sounds` so stopAllSounds() never touches it.
 let yoshiHatchSound = null;
+// One-shot easter-egg SFX (rapid-click on the home menu). Kept outside
+// `sounds` so a screen transition's stopAllSounds() never cuts it off.
+let oneUpSound = null;
+// 1-up mushroom image shown by the home-menu easter egg.
+let oneUpMushroomImage = null;
 
 // Menu background video (left half of title screen)
 let menuVideo = null;
@@ -94,8 +100,11 @@ function preload() {
   loadSoundSafe('death',         'assets/audio/music_death.mp3');
   loadSoundSafe('gameOver',      'assets/audio/music_gameover.mp3');
   loadSoundSafe('levelComplete', 'assets/audio/music_level_complete.mp3');
-  loadSoundSafe('coin',          'assets/audio/sfx_coin.wav');
+  loadSoundSafe('coin',          'assets/audio/coin_sound.mp3');
+  loadSoundSafe('powerUp',       'assets/audio/power_up_sound.mp3');
   yoshiHatchSound = loadSound('assets/audio/yoshi_hatch.mp3', null, () => { yoshiHatchSound = null; });
+  oneUpSound = loadSound('assets/audio/1-up_sound.mp3', null, () => { oneUpSound = null; });
+  oneUpMushroomImage = loadImage('assets/1_up_mushroom.jpg', null, () => { oneUpMushroomImage = null; });
 }
 
 function loadSoundSafe(key, path) {
@@ -174,6 +183,7 @@ function touchStarted() {
   handleMenuTouchAdvance();
   return false; // preventDefault → suppress Safari double-tap-zoom / scroll
 }
+
 function mousePressed() {
   handleFirstGesture();
   // Suppress synthesized mouse events on touch devices (touchStarted handles those).

@@ -152,6 +152,8 @@ function growPlayer(player) {
   player.growing = true;
   player.growTimer = GROW_TIMER_FRAMES;
   player.vx = 0;
+  // Start the power-up sound on the exact frame the grow animation begins.
+  playSoundSafe(sounds.powerUp);
 }
 
 function finishGrowingPlayer(player) {

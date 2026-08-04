@@ -404,8 +404,9 @@ function handleMenuTouchAdvance() {
         return true;
       }
     }
-    // Tap that missed both buttons — do nothing.
-    return false;
+    // Missed both buttons — spawn a Mario-on-Yoshi pop-up at each click point.
+    for (let pt of pts) spawnMenuPopup(pt.x, pt.y);
+    return true;
   }
 
   if (game.state === 'playerSelect') {

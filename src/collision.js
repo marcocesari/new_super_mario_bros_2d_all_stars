@@ -160,7 +160,7 @@ function checkMushroomCollectionFor(player) {
       p.alive = false;
       popups.splice(i, 1);
       game.score += 100;
-      growPlayer(player);
+      growPlayer(player);   // plays the power-up sound in lock-step with the grow animation
     }
   }
 }

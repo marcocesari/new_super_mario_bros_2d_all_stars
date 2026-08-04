@@ -48,6 +48,113 @@ let _menuSprTimer  = 0;
 let _menuBtnRects = { controller: null, keyboard: null };
 let _psBtnRects   = { one: null, two: null };
 
+// Playful Mario-on-Yoshi pop-ups: clicking anywhere on the home menu (except
+// the two buttons) spawns one at the cursor that hops up, then falls under
+// gravity off the bottom of the screen.
+//
+// Hidden easter egg: if the player clicks VERY FAST on the SAME SPOT and keeps
+// it up for exactly 2.5 seconds straight, the 1-up mushroom pops out with the
+// classic 1-up jingle. Two seconds later a red power-up mushroom follows with
+// the power-up sound. Then the streak resets so it can be earned again.
+let _menuPopups = [];
+const MENU_POPUP_SIZE    = 90;    // Mario-on-Yoshi pop-up size
+const MENU_MUSHROOM_SIZE = 190;   // reward mushrooms — big enough to clearly notice
+const MENU_POPUP_GRAVITY = 0.8;
+const MENU_POPUP_JUMP_VY = -11;   // initial upward "pop"
+
+// 1-up streak tracking.
+const ONE_UP_HOLD_MS      = 2500;   // must sustain the mashing for exactly 2.5 seconds
+const ONE_UP_FAST_MS      = 350;    // max gap between clicks to count as "very fast"
+const ONE_UP_SPOT_PX      = 45;     // clicks must stay within this radius
+const POWER_UP_DELAY_MS   = 2500;   // power-up mushroom follows the 1-up by 2.5 s
+let _oneUpAnchorX     = null;
+let _oneUpAnchorY     = 0;
+let _oneUpStreakStart = 0;
+let _oneUpLastClick   = 0;
+let _oneUpFired       = false;
+let _powerUpFollowAt  = 0;          // millis() to fire the power-up follow-up (0 = none)
+let _powerUpX = 0, _powerUpY = 0;   // where to pop the follow-up mushroom
+
+// Push a pop-up of a given kind ('ride' | '1up' | 'powerup') — see _drawMenuPopups.
+function _pushMenuPopup(x, y, kind) {
+  // Small random spin, direction randomized so successive pops differ.
+  let rotVel = (0.06 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1);
+  let size = (kind === '1up' || kind === 'powerup') ? MENU_MUSHROOM_SIZE : MENU_POPUP_SIZE;
+  _menuPopups.push({ x, y, vy: MENU_POPUP_JUMP_VY, rot: 0, rotVel, kind: kind || 'ride', size });
+}
+
+function spawnMenuPopup(x, y) {
+  _pushMenuPopup(x, y, 'ride');
+  _trackOneUpClick(x, y);
+}
+
+// On each click: extend the streak, or restart it if the click was too slow or
+// too far from the anchor.
+function _trackOneUpClick(x, y) {
+  const now = millis();
+  const sameSpot = _oneUpAnchorX !== null && dist(x, y, _oneUpAnchorX, _oneUpAnchorY) <= ONE_UP_SPOT_PX;
+  const fast     = now - _oneUpLastClick <= ONE_UP_FAST_MS;
+  if (!(sameSpot && fast)) {
+    _oneUpAnchorX = x;              // start a fresh streak anchored here
+    _oneUpAnchorY = y;
+    _oneUpStreakStart = now;
+    _oneUpFired = false;
+  }
+  _oneUpLastClick = now;
+}
+
+// Called every menu frame so the jingle fires the instant the fast, same-spot
+// streak reaches exactly ONE_UP_HOLD_MS — not on the next click after it.
+function _updateOneUpStreak() {
+  // Power-up follow-up, 2 s after the 1-up: red mushroom + power-up sound.
+  if (_powerUpFollowAt && millis() >= _powerUpFollowAt) {
+    _powerUpFollowAt = 0;
+    playSoundSafe(sounds.powerUp);
+    _pushMenuPopup(_powerUpX, _powerUpY, 'powerup');
+  }
+
+  if (_oneUpAnchorX === null || _oneUpFired) return;
+  const now = millis();
+  if (now - _oneUpLastClick > ONE_UP_FAST_MS) { _oneUpAnchorX = null; return; }  // streak died
+  if (now - _oneUpStreakStart >= ONE_UP_HOLD_MS) {
+    _oneUpFired = true;            // earn it again from scratch next time
+    playSoundSafe(oneUpSound);
+    _pushMenuPopup(_oneUpAnchorX, _oneUpAnchorY, '1up');   // 1-up mushroom, not Mario+Yoshi
+    _powerUpX = _oneUpAnchorX;
+    _powerUpY = _oneUpAnchorY;
+    _powerUpFollowAt = now + POWER_UP_DELAY_MS;             // schedule the power-up follow-up
+  }
+}
+
+// Advance + draw every live pop-up; drop any that has fallen fully off-screen.
+function _drawMenuPopups() {
+  for (let i = _menuPopups.length - 1; i >= 0; i--) {
+    let p = _menuPopups[i];
+    p.vy  += MENU_POPUP_GRAVITY;
+    p.y   += p.vy;
+    p.rot += p.rotVel;
+
+    const S = p.size || MENU_POPUP_SIZE;
+
+    // Drop once the whole (rotating) sprite has cleared the bottom edge.
+    if (p.y - S > height) { _menuPopups.splice(i, 1); continue; }
+
+    push();
+    translate(p.x, p.y);
+    rotate(p.rot);
+    if (p.kind === '1up' && oneUpMushroomImage) {
+      image(oneUpMushroomImage, -S / 2, -S / 2, S, S);           // 1-up mushroom (jpg)
+    } else if (p.kind === 'powerup') {
+      const f = QUESTION_ITEM[0];                                // red power-up mushroom (in-game sprite)
+      image(marioSheet, -S / 2, -S / 2, S, S, f.x, f.y, f.w, f.h);
+    } else {
+      const rf = RIDE_FRAMES[0];                                 // Mario-on-Yoshi
+      image(rideSheet, -S / 2, -S / 2, S, S, rf.x, rf.y, rf.w, rf.h);
+    }
+    pop();
+  }
+}
+
 
 // Shared title-screen backdrop: black base, sky-blue left panel, clipped video
 // on the right, and the soft blue fade divider. Used by both the main menu and
@@ -103,6 +210,12 @@ function drawMenu() {
   _drawMenuLeftPanel();
 
   _drawVersionTag();
+
+  // Click-spawned Mario-on-Yoshi pop-ups, drawn on top of everything.
+  _drawMenuPopups();
+
+  // Fire the 1-up jingle exactly 2.5 s into a fast same-spot click streak.
+  _updateOneUpStreak();
 }
 
 function _drawMenuDivider() {
