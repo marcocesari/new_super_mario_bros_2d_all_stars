@@ -235,6 +235,7 @@ function updateTouchControls() {
   if (jumpHeld && !_prevTouchJump && mario && !mario.dead && !mario.growing && mario.onGround) {
     mario.vy = mario.jumpForce;
     mario.onGround = false;
+    playJumpSound(mario);
   }
   _prevTouchJump = jumpHeld;
 

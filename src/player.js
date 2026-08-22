@@ -28,7 +28,7 @@ function createPlayer(spawnCol) {
     invincible: 0,
     growing: false,
     gpMoveDir: 0,
-    growTimer: 0,
+    growStartMs: 0,
     respawnTimer: 0,
     ridingYoshi: null,
   };
@@ -150,7 +150,7 @@ function updatePlayer(player) {
 function growPlayer(player) {
   if (player.big || player.growing) return;
   player.growing = true;
-  player.growTimer = GROW_TIMER_FRAMES;
+  player.growStartMs = millis();
   player.vx = 0;
   // Start the power-up sound on the exact frame the grow animation begins.
   playSoundSafe(sounds.powerUp);
@@ -255,14 +255,16 @@ function drawPlayer(player, isLuigi) {
   }
 
   if (player.growing) {
-    let phase = floor(frameCount / 8) % 2;
+    // Sprite follows the power-up jingle's three pulses rather than a fixed
+    // blink rate — see GROW_BIG_WINDOWS_MS.
+    let elapsedMs = millis() - player.growStartMs;
+    let big = false;
+    for (let w of GROW_BIG_WINDOWS_MS) {
+      if (elapsedMs >= w[0] && elapsedMs < w[1]) { big = true; break; }
+    }
     let f, drawW, drawH;
     let feetY = player.worldY + SPRITE_STRIDE * SCALE;
-    if (phase === 0) {
-      f = FRAMES_SMALL.idle[0];
-    } else {
-      f = FRAMES_BIG.idle[0];
-    }
+    f = big ? FRAMES_BIG.idle[0] : FRAMES_SMALL.idle[0];
     drawW = f.w * SCALE;
     drawH = f.h * SCALE;
     push();

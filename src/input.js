@@ -69,6 +69,7 @@ function pollGamepad(player) {
     if (game.state === 'playing' && player.onGround && !player.growing && !player.dead) {
       player.vy = player.jumpForce;
       player.onGround = false;
+      playJumpSound(player);
     }
     if (game.state === 'levelComplete' && game.currentLevel < LEVELS.length - 1) {
       stopAllSounds();
@@ -231,6 +232,16 @@ function playSoundSafe(sound) {
   } else {
     try { sound.play(); } catch (e) {}
   }
+}
+
+// Jump SFX: small Mario and super (big) Mario have distinct sounds. Called
+// from every jump trigger — keyboard, gamepad and touch — so they stay in sync.
+function playJumpSound(p) {
+  let s = (p && p.big) ? sounds.jumpSuper : sounds.jumpSmall;
+  if (!s) return;
+  // Boosted like the other SFX so it carries over the level music (vol 0.5).
+  try { s.setVolume(1.2); } catch (e) {}
+  playSoundSafe(s);
 }
 
 function stopAllSounds() {
@@ -477,12 +488,14 @@ function keyPressed() {
   if (isP1Jump && game.state === 'playing' && !mario.dead && mario.onGround && !mario.growing) {
     mario.vy = mario.jumpForce;
     mario.onGround = false;
+    playJumpSound(mario);
   }
 
   // P2 Jump
   if (isP2Jump && luigi && game.state === 'playing' && !luigi.dead && luigi.onGround && !luigi.growing) {
     luigi.vy = luigi.jumpForce;
     luigi.onGround = false;
+    playJumpSound(luigi);
   }
 
   // Next level

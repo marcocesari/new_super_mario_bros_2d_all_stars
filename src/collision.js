@@ -104,10 +104,13 @@ function isPlayer(ent) {
 
 function checkEnemyCollisionsFor(player) {
   if (player.dead) return;
-  if (player.invincible > 0) {
-    player.invincible--;
-    return;
-  }
+
+  // While the post-hit flash is running the player takes no damage, but can
+  // still deal it — stomps and shell kicks work exactly as normal.
+  // Taking a hit below sets this too, so a second enemy touched on the same
+  // frame can't chain another hit on top of the first.
+  let invincible = player.invincible > 0;
+  if (invincible) player.invincible--;
 
   for (let enemy of enemies) {
     if (!enemy.alive || !enemy.active || enemy.state === 'stomped') continue;
@@ -122,13 +125,17 @@ function checkEnemyCollisionsFor(player) {
         // Jump on enemy: normal stomp
         stompEnemy(enemy);
         player.vy = STOMP_BOUNCE;
+      } else if (invincible) {
+        // Flashing: the enemy just can't touch him.
       } else if (player.big) {
         // Big Mario on Yoshi: shrink back to small, keep Yoshi
         shrinkPlayer(player);
+        invincible = true;
       } else {
         // Small Mario on Yoshi: lose Yoshi, Mario continues
         dismountYoshi(player);
         player.invincible = INVINCIBILITY_FRAMES;
+        invincible = true;
       }
       continue;
     }
@@ -142,11 +149,13 @@ function checkEnemyCollisionsFor(player) {
       let kickDir = (player.worldX + player.ox + player.hw / 2) < (enemy.worldX + enemy.ox + enemy.hw / 2) ? 1 : -1;
       enemy.state = 'shellSlide';
       enemy.vx = kickDir * 6;
-    } else {
+    } else if (!invincible) {
       if (player.big) {
         shrinkPlayer(player);
+        invincible = true;
       } else {
         killPlayer(player);
+        return;
       }
     }
   }

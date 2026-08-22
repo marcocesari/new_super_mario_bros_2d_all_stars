@@ -102,6 +102,8 @@ function preload() {
   loadSoundSafe('levelComplete', 'assets/audio/music_level_complete.mp3');
   loadSoundSafe('coin',          'assets/audio/coin_sound.mp3');
   loadSoundSafe('powerUp',       'assets/audio/power_up_sound.mp3');
+  loadSoundSafe('jumpSmall',     'assets/audio/jump-small.mp3');
+  loadSoundSafe('jumpSuper',     'assets/audio/jump-super.mp3');
   yoshiHatchSound = loadSound('assets/audio/yoshi_hatch.mp3', null, () => { yoshiHatchSound = null; });
   oneUpSound = loadSound('assets/audio/1-up_sound.mp3', null, () => { oneUpSound = null; });
   oneUpMushroomImage = loadImage('assets/1_up_mushroom.jpg', null, () => { oneUpMushroomImage = null; });
@@ -235,9 +237,8 @@ function draw() {
         break;
       }
       for (let p of players) {
-        if (p.growing) {
-          p.growTimer--;
-          if (p.growTimer <= 0) finishGrowingPlayer(p);
+        if (p.growing && millis() - p.growStartMs >= GROW_DURATION_MS) {
+          finishGrowingPlayer(p);
         }
       }
       for (let p of players) {
