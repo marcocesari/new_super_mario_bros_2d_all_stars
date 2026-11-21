@@ -1,6 +1,6 @@
 // ── Core constants ──
 // Bump on each iteration so the user can tell which build the menu is running.
-const GAME_VERSION = 'v2026-11-21.4';
+const GAME_VERSION = 'v2026-11-21.5';
 
 const SCALE = 3;
 const TILE = 16;

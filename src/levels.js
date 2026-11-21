@@ -55,16 +55,16 @@ const LEVEL_3 = [
 // the 'v' pipe on the right takes him back up to the level's '^' pipe.
 // 'b' = blue brick, 'U' = blue ground, 'o' = collectible coin.
 const UNDERGROUND_ROOM = [
-  'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', // 0
-  'b..............................b', // 1
-  'b.........oooooooooo...........b', // 2
-  'b........bbbbbbbbbbbb..........b', // 3
-  'b..............................b', // 4
-  'b...oooooooo.....oooooo........b', // 5
-  'b...bbbbbbbb.....bbbbbb.....v..b', // 6
-  'b...........................[].b', // 7
-  'b.............oooo..........{}.b', // 8
-  'UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU', // 9
+  'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', // 0
+  'b...........ooooooo..............oooooo............ooo.........b', // 1
+  'b.........ooooooooooo..........oooooooooo........ooooooo.......b', // 2
+  'b........bbbbbbbbbbbbb........bbbbbbbbbbbb......bbbbbbbbb......b', // 3
+  'b..............................................................b', // 4
+  'b...oooooooo..............oooooooo..........oooooooo...........b', // 5
+  'b...bbbbbbbb..............bbbbbbbb..........bbbbbbbb........v..b', // 6
+  'b............oooooo...ooo..........oooooo............ooooo..[].b', // 7
+  'b............oooooo...ooo..........oooooo............ooooo..{}.b', // 8
+  'UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU', // 9
 ];
 
 // One underground room per level (same index as LEVELS).
