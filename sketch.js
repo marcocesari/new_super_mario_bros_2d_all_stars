@@ -306,6 +306,7 @@ function draw() {
   scale(viewScale);
   drawPipePlayers();   // behind the tiles, so the pipe hides them
   drawLevel();
+  drawPipeMarkers();   // bouncing V over enterable pipes
   drawEnemies();
   drawPopups();
   drawCoinPopups();
