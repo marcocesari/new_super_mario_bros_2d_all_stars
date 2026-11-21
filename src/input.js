@@ -384,13 +384,28 @@ function loadLevel(mapStrings, keepPowerUps) {
   let marioSnap = keepPowerUps ? snapshotPowerUps(mario) : null;
   let luigiSnap = keepPowerUps ? snapshotPowerUps(luigi) : null;
 
+  buildLevelGrid(mapStrings);
+  popups = [];
+  coinPopups = [];
+  resetYoshis();
+  resetPipeState();
+
+  resetPlayers();
+  applyPowerUps(mario, marioSnap);
+  applyPowerUps(luigi, luigiSnap);
+
+  cameraX = 0;
+  game.state = 'playing';
+  playLevelMusic();
+}
+
+// Parse a map into levelData, spawn its enemies and find its warp pipes.
+// Shared by loadLevel and the underground-room switch in pipes.js.
+function buildLevelGrid(mapStrings) {
   levelRows = mapStrings.length;
   levelCols = mapStrings[0].length;
   levelData = [];
   enemies = [];
-  popups = [];
-  coinPopups = [];
-  resetYoshis();
 
   for (let r = 0; r < levelRows; r++) {
     levelData[r] = [];
@@ -407,13 +422,7 @@ function loadLevel(mapStrings, keepPowerUps) {
     }
   }
 
-  resetPlayers();
-  applyPowerUps(mario, marioSnap);
-  applyPowerUps(luigi, luigiSnap);
-
-  cameraX = 0;
-  game.state = 'playing';
-  playLevelMusic();
+  scanPipeMarkers(mapStrings);
 }
 
 // ── Keyboard input ──
@@ -479,7 +488,8 @@ function keyPressed() {
   if (game.state === 'playing' && !mario.dead) {
     if (keyCode === UP_ARROW) {
       dismountYoshiVoluntary(mario);
-    } else if (keyCode === DOWN_ARROW) {
+    } else if (keyCode === DOWN_ARROW && !pipeUnderPlayer(mario)) {
+      // Down on an entrance pipe goes down the pipe (see tryEnterPipe)
       callYoshiToPlayer(mario);
     }
   }

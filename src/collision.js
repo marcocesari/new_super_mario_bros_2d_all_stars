@@ -3,7 +3,7 @@
 function isSolid(row, col) {
   if (row < 0 || col < 0 || row >= levelRows || col >= levelCols) return false;
   let t = levelData[row][col];
-  return t !== null && t !== 'flag';
+  return t !== null && t !== 'flag' && t !== 'coin';
 }
 
 // Move entity, resolve collisions on both axes. Returns true if hit a wall on X.

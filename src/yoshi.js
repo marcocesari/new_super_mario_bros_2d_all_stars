@@ -448,7 +448,7 @@ function dismountYoshi(player) {
 // ── Voluntary dismount — Yoshi stays alive next to the player ──
 
 function dismountYoshiVoluntary(player) {
-  if (!player.ridingYoshi) return;
+  if (!player.ridingYoshi || player.inPipe) return;
   let y = player.ridingYoshi;
   y.mounted = false;
   // Place Yoshi just behind the player so we don't immediately re-mount
@@ -464,7 +464,7 @@ function dismountYoshiVoluntary(player) {
 // ── Call Yoshi — summon the nearest unmounted Yoshi to the player ──
 
 function callYoshiToPlayer(player) {
-  if (player.dead || player.ridingYoshi) return;
+  if (player.dead || player.ridingYoshi || player.inPipe) return;
   let nearest = null;
   let nearestDist = Infinity;
   for (let y of yoshis) {

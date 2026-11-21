@@ -5,6 +5,7 @@ const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0
 // Held state, read by player movement and Yoshi eat logic.
 let touchLeftHeld = false;
 let touchRightHeld = false;
+let touchDownHeld = false;   // joystick pulled down — enters 'v' pipes
 let touchActionHeld = false;
 
 // For edge detection on face buttons.
@@ -198,12 +199,17 @@ function _updateVirtualJoystick(L) {
     let shortEdge = min(width, height);
     let deadzone = max(8, shortEdge * 0.02);
     let dx = _joystick.curX - _joystick.startX;
-    if (dx > deadzone) { touchLeftHeld = false; touchRightHeld = true; }
+    let dy = _joystick.curY - _joystick.startY;
+    // Pulled mostly downward: "down" (pipe entry), no sideways drift.
+    touchDownHeld = dy > deadzone * 2 && dy > abs(dx);
+    if (touchDownHeld) { touchLeftHeld = false; touchRightHeld = false; }
+    else if (dx > deadzone) { touchLeftHeld = false; touchRightHeld = true; }
     else if (dx < -deadzone) { touchLeftHeld = true; touchRightHeld = false; }
     else { touchLeftHeld = false; touchRightHeld = false; }
   } else {
     touchLeftHeld = false;
     touchRightHeld = false;
+    touchDownHeld = false;
   }
 }
 
@@ -215,6 +221,7 @@ function updateTouchControls() {
   if (!isTouchDevice || game.state !== 'playing' || nativeGpActive) {
     touchLeftHeld = false;
     touchRightHeld = false;
+    touchDownHeld = false;
     touchActionHeld = false;
     _prevTouchJump = false;
     _prevTouchAction = false;

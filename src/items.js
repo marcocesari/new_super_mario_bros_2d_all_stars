@@ -13,6 +13,23 @@ function hitCoinBlock(row, col) {
   });
 }
 
+// Free-floating coins ('o' tiles, e.g. in the underground rooms): collected on touch.
+function checkCoinTilesFor(player) {
+  let left = player.worldX + player.ox;
+  let top = player.worldY + player.oy;
+  let c0 = floor(left / TILE_DRAW), c1 = floor((left + player.hw - 1) / TILE_DRAW);
+  let r0 = floor(top / TILE_DRAW), r1 = floor((top + player.hh - 1) / TILE_DRAW);
+  for (let r = max(0, r0); r <= min(levelRows - 1, r1); r++) {
+    for (let c = max(0, c0); c <= min(levelCols - 1, c1); c++) {
+      if (levelData[r][c] !== 'coin') continue;
+      levelData[r][c] = null;
+      game.score += 200;
+      game.coinCount++;
+      if (sounds.coin) { sounds.coin.setVolume(1.5); sounds.coin.play(); }
+    }
+  }
+}
+
 function hitQuestionBlock(row, col) {
   levelData[row][col] = 'hitBlock';
   popups.push({

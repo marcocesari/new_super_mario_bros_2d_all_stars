@@ -65,6 +65,8 @@ const BLOCK_SPRITES = {
   pipeBodyL:  blk(16, 7),
   pipeBodyR:  blk(17, 7),
   coin:       blk(9, 11),
+  ugBrick:    blk(1, 2),  // blue (underground) palette
+  ugGround:   blk(4, 2),
   coinBlock:  blk(6, 1), // looks like ? block, gives coin
   yoshiBlock: blk(6, 1), // looks like ? block, gives yoshi egg
 };
@@ -86,4 +88,9 @@ const TILE_CHARS = {
   'g': null, // goomba spawn (tile is empty)
   'k': null, // koopa spawn (tile is empty)
   'y': 'yoshiBlock', // yoshi egg block (looks like ? block)
+  'v': null, // marks the pipe below as a warp ENTRANCE (press down)
+  '^': null, // marks the pipe below as the warp EXIT
+  'b': 'ugBrick',
+  'U': 'ugGround',
+  'o': 'coin', // collectible coin (not solid)
 };

@@ -18,6 +18,7 @@ let sounds = {
   levelComplete: null,
   coin: null,
   powerUp: null,
+  pipe: null,
 };
 
 // Kept outside `sounds` so stopAllSounds() never touches it.
@@ -104,6 +105,7 @@ function preload() {
   loadSoundSafe('powerUp',       'assets/audio/power_up_sound.mp3');
   loadSoundSafe('jumpSmall',     'assets/audio/jump-small.mp3');
   loadSoundSafe('jumpSuper',     'assets/audio/jump-super.mp3');
+  loadSoundSafe('pipe',          'assets/audio/super-mario-bros%20(1).mp3');
   yoshiHatchSound = loadSound('assets/audio/yoshi_hatch.mp3', null, () => { yoshiHatchSound = null; });
   oneUpSound = loadSound('assets/audio/1-up_sound.mp3', null, () => { oneUpSound = null; });
   oneUpMushroomImage = loadImage('assets/1_up_mushroom.jpg', null, () => { oneUpMushroomImage = null; });
@@ -221,7 +223,7 @@ function draw() {
     return;
   }
 
-  let bg = LEVEL_THEMES[game.currentLevel].bg;
+  let bg = inUnderground ? [0, 0, 0] : LEVEL_THEMES[game.currentLevel].bg;
   background(bg[0], bg[1], bg[2]);
 
   // Fit the trimmed stage (10 rows) into the viewport height exactly, so the
@@ -234,6 +236,12 @@ function draw() {
       // Yoshi hatch cutscene: only update the egg animation, freeze everything else.
       if (game.yoshiHatching) {
         updateYoshiEggs();
+        break;
+      }
+      // Going down / coming up a warp pipe: freeze everything else.
+      if (pipeWarp) {
+        updatePipeWarp();
+        updateCamera();
         break;
       }
       for (let p of players) {
@@ -259,6 +267,7 @@ function draw() {
           yoshiTryEat(p);
           checkEnemyCollisionsFor(p);
           checkMushroomCollectionFor(p);
+          checkCoinTilesFor(p);
         }
       }
       updatePopups();
@@ -295,6 +304,7 @@ function draw() {
   push();
   translate(0, worldYOffset);
   scale(viewScale);
+  drawPipePlayers();   // behind the tiles, so the pipe hides them
   drawLevel();
   drawEnemies();
   drawPopups();

@@ -31,6 +31,7 @@ function createPlayer(spawnCol) {
     growStartMs: 0,
     respawnTimer: 0,
     ridingYoshi: null,
+    inPipe: false,
   };
   setSmallHitbox(p);
   return p;
@@ -66,6 +67,9 @@ function getPlayerInput(player) {
 // ── Player update ──
 
 function updatePlayer(player) {
+  // Standing on a 'v' pipe and pressing down: head into the pipe.
+  if (tryEnterPipe(player)) return;
+
   let input = getPlayerInput(player);
   let spd = player.ridingYoshi ? RIDING_SPEED : player.speed;
 
@@ -224,6 +228,7 @@ function respawnPlayer(player) {
   player.big = false;
   player.growing = false;
   player.ridingYoshi = null;
+  player.inPipe = false;
   setSmallHitbox(player);
   player.respawnTimer = 0;
 }
@@ -238,6 +243,8 @@ function drawAllPlayers() {
 function drawPlayer(player, isLuigi) {
   if (player.dead && player.respawnTimer <= 0 && (game.state === 'gameover' || game.state === 'dead')) return;
   if (player.dead && player.respawnTimer <= 0 && game.state === 'playing') return;
+  // Players inside a pipe are drawn in a separate pass behind the tiles.
+  if (player.inPipe !== _drawingPipePlayers) return;
 
   // Blink during invincibility
   if (player.invincible > 0 && floor(frameCount / 4) % 2 === 0) return;
