@@ -191,6 +191,7 @@ function enterUnderground() {
   }
   inUnderground = true;
   pipeWarp = null;
+  playLevelMusic();   // switches to the underground theme (loops while down here)
 
   // Drop in from the ceiling at the left of the room.
   players.forEach((pl, i) => {
@@ -210,6 +211,7 @@ function leaveUnderground(trigger) {
   savedOverworld = null;
   inUnderground = false;
   pipeWarp = null;
+  playLevelMusic();   // back to the level's own theme, from the start
 
   let exit = pipeExit || pipeEntrances[0];
   if (!exit) {
@@ -258,30 +260,4 @@ function drawPipePlayers() {
     if (p.inPipe) drawPlayer(p, p === luigi);
   }
   _drawingPipePlayers = false;
-}
-
-// A bouncing yellow "V" arrow above every warp-entrance pipe, so players can
-// see which pipes can be entered with DOWN.
-function drawPipeMarkers() {
-  let bob = sin(frameCount * 0.12) * 6;
-  for (let p of pipeEntrances) {
-    let cx = (p.col + 1) * TILE_DRAW - cameraX;   // centre of the 2-wide pipe
-    let tipY = p.row * TILE_DRAW - 14 + bob;     // arrow tip just above the rim
-    let w = 30, h = 26, t = 9;                   // width, height, stroke thickness
-    push();
-    stroke(0);
-    strokeWeight(4);
-    strokeJoin(ROUND);
-    fill(255, 216, 0);
-    // Chunky "V" shape pointing down into the pipe
-    beginShape();
-    vertex(cx - w / 2, tipY - h);
-    vertex(cx - w / 2 + t, tipY - h);
-    vertex(cx, tipY - t * 1.2);
-    vertex(cx + w / 2 - t, tipY - h);
-    vertex(cx + w / 2, tipY - h);
-    vertex(cx, tipY);
-    endShape(CLOSE);
-    pop();
-  }
 }

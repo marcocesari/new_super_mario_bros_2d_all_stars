@@ -275,7 +275,9 @@ function stopScreenMusic(key) {
 }
 
 function playLevelMusic() {
-  let levelMusic = game.currentLevel === 1 ? sounds.music2
+  // Underground bonus rooms have their own theme (falls back to the level's).
+  let levelMusic = (inUnderground && sounds.underground) ? sounds.underground
+                 : game.currentLevel === 1 ? sounds.music2
                  : game.currentLevel === 2 ? sounds.music3
                  : sounds.music;
   if (!levelMusic) return;
