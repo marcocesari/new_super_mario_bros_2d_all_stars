@@ -72,6 +72,7 @@ function updatePlayer(player) {
 
   let input = getPlayerInput(player);
   let spd = player.ridingYoshi ? RIDING_SPEED : player.speed;
+  if (inUnderground) spd *= UNDERGROUND_SPEED_MULT;
 
   // Combine keyboard + gamepad into one direction (-1, 0, 1).
   // Single source of truth for movement, so keyboard and controller use
@@ -139,7 +140,8 @@ function updatePlayer(player) {
 
   if (player.state === 'walk') {
     player.animTimer++;
-    if (player.animTimer >= 6) {
+    // Walk frames advance every 6 ticks — UNDERGROUND_SPEED_MULT× quicker underground.
+    if (player.animTimer >= (inUnderground ? 6 / UNDERGROUND_SPEED_MULT : 6)) {
       player.animTimer = 0;
       player.animFrame = (player.animFrame + 1) % 3;
     }

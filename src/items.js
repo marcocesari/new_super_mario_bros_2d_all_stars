@@ -13,12 +13,23 @@ function hitCoinBlock(row, col) {
   });
 }
 
+const YOSHI_COIN_PAD_X = 12; // extra reach either side while riding Yoshi
+
 // Free-floating coins ('o' tiles, e.g. in the underground rooms): collected on touch.
 function checkCoinTilesFor(player) {
   let left = player.worldX + player.ox;
   let top = player.worldY + player.oy;
-  let c0 = floor(left / TILE_DRAW), c1 = floor((left + player.hw - 1) / TILE_DRAW);
-  let r0 = floor(top / TILE_DRAW), r1 = floor((top + player.hh - 1) / TILE_DRAW);
+  let w = player.hw;
+  let bottom = top + player.hh;
+  // Riding Yoshi, the drawn Mario+Yoshi sprite is much taller (and a bit wider)
+  // than Mario's own hitbox — grab coins with the whole visible body.
+  if (player.ridingYoshi) {
+    top = min(top, bottom - (RIDE_DRAW_SIZE - YOSHI_FEET_OFFSET));
+    left -= YOSHI_COIN_PAD_X;
+    w += 2 * YOSHI_COIN_PAD_X;
+  }
+  let c0 = floor(left / TILE_DRAW), c1 = floor((left + w - 1) / TILE_DRAW);
+  let r0 = floor(top / TILE_DRAW), r1 = floor((bottom - 1) / TILE_DRAW);
   for (let r = max(0, r0); r <= min(levelRows - 1, r1); r++) {
     for (let c = max(0, c0); c <= min(levelCols - 1, c1); c++) {
       if (levelData[r][c] !== 'coin') continue;

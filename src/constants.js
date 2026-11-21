@@ -1,6 +1,6 @@
 // ── Core constants ──
 // Bump on each iteration so the user can tell which build the menu is running.
-const GAME_VERSION = 'v2026-11-21.5';
+const GAME_VERSION = 'v2026-11-21.11';
 
 const SCALE = 3;
 const TILE = 16;
@@ -11,6 +11,9 @@ const SPRITE_STRIDE = 18; // sprite grid cell size (pixels) in mario_and_items.p
 // ── Physics ──
 const PLAYER_SPEED = 4.2;
 const RIDING_SPEED = 4.5;
+// Underground bonus room: Mario runs (and animates) this many times faster.
+// The underground music always plays at its normal speed.
+const UNDERGROUND_SPEED_MULT = 4;
 const JUMP_FORCE = -17;
 const STOMP_BOUNCE = -8;
 

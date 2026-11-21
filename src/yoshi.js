@@ -393,7 +393,7 @@ function drawRidingYoshi(player) {
   // Animate walk (fast cycle)
   if (player.state === 'walk') {
     y.animTimer++;
-    if (y.animTimer >= 3) {
+    if (y.animTimer >= (inUnderground ? 3 / UNDERGROUND_SPEED_MULT : 3)) {
       y.animTimer = 0;
       y.animFrame = (y.animFrame + 1) % RIDE_FRAMES.length;
     }
